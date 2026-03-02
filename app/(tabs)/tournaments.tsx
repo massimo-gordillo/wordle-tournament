@@ -1,0 +1,391 @@
+import { useState, useEffect } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, TextInput, ActivityIndicator, Modal } from 'react-native';
+import { router } from 'expo-router';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/lib/supabase';
+import { Search } from 'lucide-react-native';
+
+interface Tournament {
+  id: string;
+  name: string;
+  start_date: string;
+  end_date: string;
+  status: 'draft' | 'active' | 'closed';
+  created_by: string;
+  join_code: string;
+}
+
+export default function OngoingTournamentsScreen() {
+  const { user } = useAuth();
+  const [tournaments, setTournaments] = useState<Tournament[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [joinModalVisible, setJoinModalVisible] = useState(false);
+  const [joinCode, setJoinCode] = useState('');
+  const [joinError, setJoinError] = useState('');
+  const [joiningTournament, setJoiningTournament] = useState(false);
+
+  useEffect(() => {
+    loadTournaments();
+  }, []);
+
+  const loadTournaments = async () => {
+    if (!user) return;
+
+    const { data: participantData } = await supabase
+      .from('tournament_participants')
+      .select('tournament_id')
+      .eq('user_id', user.id);
+
+    const tournamentIds = participantData?.map(p => p.tournament_id) || [];
+
+    if (tournamentIds.length === 0) {
+      setLoading(false);
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from('tournaments')
+      .select('*')
+      .in('id', tournamentIds)
+      .in('status', ['active', 'draft'])
+      .order('created_at', { ascending: false });
+
+    if (!error && data) {
+      setTournaments(data);
+    }
+
+    setLoading(false);
+  };
+
+  const handleJoinTournament = async () => {
+    if (!joinCode.trim()) {
+      setJoinError('Please enter a join code');
+      return;
+    }
+
+    setJoiningTournament(true);
+    setJoinError('');
+
+    const { data: tournament } = await supabase
+      .from('tournaments')
+      .select('id, status')
+      .eq('join_code', joinCode.toUpperCase())
+      .maybeSingle();
+
+    if (!tournament) {
+      setJoinError('Invalid join code');
+      setJoiningTournament(false);
+      return;
+    }
+
+    if (tournament.status === 'closed') {
+      setJoinError('This tournament has ended');
+      setJoiningTournament(false);
+      return;
+    }
+
+    const { error } = await supabase
+      .from('tournament_participants')
+      .insert([
+        {
+          tournament_id: tournament.id,
+          user_id: user!.id,
+        },
+      ]);
+
+    setJoiningTournament(false);
+
+    if (error) {
+      if (error.message.includes('duplicate')) {
+        setJoinError('You are already in this tournament');
+      } else {
+        setJoinError(error.message);
+      }
+    } else {
+      setJoinModalVisible(false);
+      setJoinCode('');
+      loadTournaments();
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'active':
+        return '#10b981';
+      case 'draft':
+        return '#f59e0b';
+      default:
+        return '#6b7280';
+    }
+  };
+
+  const getStatusText = (status: string) => {
+    return status.charAt(0).toUpperCase() + status.slice(1);
+  };
+
+  return (
+    <View style={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.title}>Ongoing Tournaments</Text>
+        <TouchableOpacity
+          style={styles.joinButton}
+          onPress={() => setJoinModalVisible(true)}
+        >
+          <Search size={20} color="#fff" />
+          <Text style={styles.joinButtonText}>Join by Code</Text>
+        </TouchableOpacity>
+      </View>
+
+      <ScrollView style={styles.content}>
+        {loading ? (
+          <ActivityIndicator color="#10b981" style={{ marginTop: 40 }} />
+        ) : tournaments.length === 0 ? (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyText}>No ongoing tournaments</Text>
+            <Text style={styles.emptySubtext}>Join a tournament using a code to get started</Text>
+          </View>
+        ) : (
+          <View style={styles.section}>
+            {tournaments.map(tournament => (
+              <TouchableOpacity
+                key={tournament.id}
+                style={styles.tournamentCard}
+                onPress={() => router.push(`/tournament/${tournament.id}`)}
+              >
+                <View style={styles.tournamentHeader}>
+                  <Text style={styles.tournamentName}>{tournament.name}</Text>
+                  <View style={[styles.statusBadge, { backgroundColor: getStatusColor(tournament.status) }]}>
+                    <Text style={styles.statusText}>{getStatusText(tournament.status)}</Text>
+                  </View>
+                </View>
+                <Text style={styles.tournamentDate}>
+                  {new Date(tournament.start_date).toLocaleDateString()} - {new Date(tournament.end_date).toLocaleDateString()}
+                </Text>
+                <Text style={styles.joinCodeText}>Code: {tournament.join_code}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+      </ScrollView>
+
+      <Modal
+        visible={joinModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setJoinModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Join Tournament</Text>
+            <Text style={styles.modalSubtitle}>Enter the tournament join code</Text>
+
+            <TextInput
+              style={styles.input}
+              placeholder="Join Code (e.g., ABC123)"
+              placeholderTextColor="#999"
+              value={joinCode}
+              onChangeText={(text) => setJoinCode(text.toUpperCase())}
+              autoCapitalize="characters"
+              maxLength={6}
+              editable={!joiningTournament}
+            />
+
+            {joinError ? <Text style={styles.error}>{joinError}</Text> : null}
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalButtonCancel]}
+                onPress={() => {
+                  setJoinModalVisible(false);
+                  setJoinCode('');
+                  setJoinError('');
+                }}
+                disabled={joiningTournament}
+              >
+                <Text style={styles.modalButtonTextCancel}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalButtonJoin, joiningTournament && styles.buttonDisabled]}
+                onPress={handleJoinTournament}
+                disabled={joiningTournament}
+              >
+                {joiningTournament ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.modalButtonTextJoin}>Join</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#f5f5f5',
+  },
+  header: {
+    backgroundColor: '#10b981',
+    padding: 24,
+    paddingTop: 60,
+    paddingBottom: 24,
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginBottom: 16,
+  },
+  joinButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    gap: 8,
+  },
+  joinButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  content: {
+    flex: 1,
+  },
+  section: {
+    padding: 16,
+  },
+  tournamentCard: {
+    backgroundColor: '#fff',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  tournamentHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  tournamentName: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1a1a1a',
+    flex: 1,
+  },
+  statusBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  statusText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  tournamentDate: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 4,
+  },
+  joinCodeText: {
+    fontSize: 14,
+    color: '#10b981',
+    fontWeight: '500',
+  },
+  emptyState: {
+    alignItems: 'center',
+    paddingVertical: 60,
+    paddingHorizontal: 40,
+  },
+  emptyText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1a1a1a',
+    marginBottom: 8,
+  },
+  emptySubtext: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 24,
+    width: '100%',
+    maxWidth: 400,
+  },
+  modalTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#1a1a1a',
+    marginBottom: 8,
+  },
+  modalSubtitle: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 24,
+  },
+  input: {
+    backgroundColor: '#f9fafb',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    marginBottom: 16,
+  },
+  error: {
+    color: '#ef4444',
+    fontSize: 14,
+    marginBottom: 16,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  modalButton: {
+    flex: 1,
+    padding: 14,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  modalButtonCancel: {
+    backgroundColor: '#f3f4f6',
+  },
+  modalButtonJoin: {
+    backgroundColor: '#10b981',
+  },
+  modalButtonTextCancel: {
+    color: '#1a1a1a',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  modalButtonTextJoin: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  buttonDisabled: {
+    opacity: 0.6,
+  },
+});
