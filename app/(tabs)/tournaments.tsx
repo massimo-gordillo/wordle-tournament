@@ -66,40 +66,24 @@ export default function OngoingTournamentsScreen() {
     setJoiningTournament(true);
     setJoinError('');
 
-    const { data: tournament } = await supabase
-      .from('tournaments')
-      .select('id, status')
-      .eq('join_code', joinCode.toUpperCase())
-      .maybeSingle();
-
-    if (!tournament) {
-      setJoinError('Invalid join code');
-      setJoiningTournament(false);
-      return;
-    }
-
-    if (tournament.status === 'closed') {
-      setJoinError('This tournament has ended');
-      setJoiningTournament(false);
-      return;
-    }
-
-    const { error } = await supabase
-      .from('tournament_participants')
-      .insert([
-        {
-          tournament_id: tournament.id,
-          user_id: user!.id,
-        },
-      ]);
+    const { data, error } = await supabase.rpc('join_tournament_by_code', {
+      p_join_code: joinCode.toUpperCase(),
+    });
 
     setJoiningTournament(false);
 
     if (error) {
-      if (error.message.includes('duplicate')) {
+      const message = error.message || 'Unable to join tournament';
+      if (message.includes('already in this tournament')) {
         setJoinError('You are already in this tournament');
+      } else if (message.includes('maximum number of tournaments')) {
+        setJoinError('You are already in the maximum number of tournaments (4)');
+      } else if (message.includes('tournament is full')) {
+        setJoinError('This tournament is full');
+      } else if (message.includes('Invalid or inactive join code')) {
+        setJoinError('Invalid join code');
       } else {
-        setJoinError(error.message);
+        setJoinError(message);
       }
     } else {
       setJoinModalVisible(false);

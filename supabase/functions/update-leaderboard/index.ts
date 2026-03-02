@@ -1,4 +1,11 @@
-import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+// Deno runtime globals are provided by the Supabase Edge Functions runtime.
+// Declare a minimal ambient type so this file typechecks in the Expo/TS config.
+declare const Deno: {
+  env: {
+    get(name: string): string | undefined;
+  };
+  serve: (handler: (req: Request) => Response | Promise<Response>) => void;
+};
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -67,8 +74,9 @@ Deno.serve(async (req: Request) => {
       }
     );
   } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: message }),
       {
         status: 500,
         headers: {

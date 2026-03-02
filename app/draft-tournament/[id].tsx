@@ -83,12 +83,15 @@ export default function DraftTournamentScreen() {
   };
 
   const handleCopyCode = () => {
-    if (tournament) {
-      // For web, we can use the clipboard API if available
-      if (navigator?.clipboard) {
-        navigator.clipboard.writeText(tournament.join_code);
-      }
+    if (!tournament) return;
+
+    // Web: use the Clipboard API when available
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      navigator.clipboard.writeText(tournament.join_code);
+      return;
     }
+
+    // Native: no-op for now (could be replaced with expo-clipboard)
   };
 
   const handleStartTournament = async () => {
