@@ -76,5 +76,8 @@ BEGIN
 
   RETURN v_tournament_id;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+
+REVOKE ALL ON FUNCTION join_tournament_by_code(text) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION join_tournament_by_code(text) TO authenticated;
 

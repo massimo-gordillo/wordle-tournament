@@ -112,47 +112,30 @@ export default function ManageTournamentsScreen() {
 
     const tournamentName = `${userDisplayName}'s tournament`;
 
-    const { data, error: createError } = await supabase
-      .from('tournaments')
-      .insert([
-        {
-          name: tournamentName,
-          start_date: today.toISOString(),
-          end_date: endDate.toISOString(),
-          created_by: user!.id,
-        },
-      ])
-      .select()
-      .single();
+    const startDateStr = today.toISOString().slice(0, 10);
+    const endDateStr = endDate.toISOString().slice(0, 10);
+
+    const { data: tournamentId, error: createError } = await supabase.rpc('create_tournament_draft', {
+      p_name: tournamentName,
+      p_start_date: startDateStr,
+      p_end_date: endDateStr,
+    });
 
     if (createError) {
       setSaving(false);
-      setError(createError.message);
+      const message = createError.message || 'Unable to create tournament';
+      if (message.includes('maximum number of tournaments')) {
+        setError('You are already in the maximum number of tournaments (4)');
+      } else {
+        setError(message);
+      }
       return;
     }
 
-    if (data) {
-      const { error: participantError } = await supabase
-        .from('tournament_participants')
-        .insert([
-          {
-            tournament_id: data.id,
-            user_id: user!.id,
-          },
-        ]);
-
-      setSaving(false);
-
-      if (participantError) {
-        setError('Tournament created but failed to add you as participant');
-      } else {
-        setCreateModalVisible(false);
-        setDuration(DURATION_OPTIONS[0]);
-        router.push(`/draft-tournament/${data.id}`);
-      }
-    } else {
-      setSaving(false);
-    }
+    setSaving(false);
+    setCreateModalVisible(false);
+    setDuration(DURATION_OPTIONS[0]);
+    router.push(`/draft-tournament/${tournamentId}`);
   };
 
   const renderMenu = () => (

@@ -4,10 +4,14 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "EXPO_NO_TELEMETRY=1 expo start",
+    "dev": "cross-env EXPO_NO_TELEMETRY=1 expo start",
     "build:web": "expo export --platform web",
     "lint": "expo lint",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "supabase:status": "supabase status",
+    "supabase:db:push": "supabase db push",
+    "supabase:db:reset": "supabase db reset",
+    "supabase:functions:deploy": "supabase functions deploy update-leaderboard"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.2",
@@ -46,6 +50,8 @@
   "devDependencies": {
     "@babel/core": "^7.25.2",
     "@types/react": "~19.1.10",
+    "babel-plugin-module-resolver": "^5.0.2",
+    "cross-env": "^10.1.0",
     "supabase": "^2.76.15",
     "typescript": "~5.9.2"
   }
