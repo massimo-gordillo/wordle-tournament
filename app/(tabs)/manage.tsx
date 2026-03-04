@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, Modal } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, Modal, RefreshControl } from 'react-native';
 import { router } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
@@ -40,6 +40,8 @@ export default function ManageTournamentsScreen() {
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const [userDisplayName, setUserDisplayName] = useState('');
+  const [refreshingDrafts, setRefreshingDrafts] = useState(false);
+  const [refreshingPast, setRefreshingPast] = useState(false);
 
   useEffect(() => {
     loadUserDisplayName();
@@ -93,6 +95,18 @@ export default function ManageTournamentsScreen() {
     }
 
     setLoading(false);
+  };
+
+  const handleRefreshDrafts = async () => {
+    setRefreshingDrafts(true);
+    await loadDraftTournaments();
+    setRefreshingDrafts(false);
+  };
+
+  const handleRefreshPast = async () => {
+    setRefreshingPast(true);
+    await loadPastTournaments();
+    setRefreshingPast(false);
   };
 
   const handleCreateTournament = async () => {
@@ -184,7 +198,12 @@ export default function ManageTournamentsScreen() {
   );
 
   const renderDrafts = () => (
-    <ScrollView style={styles.content}>
+    <ScrollView
+      style={styles.content}
+      refreshControl={
+        <RefreshControl refreshing={refreshingDrafts} onRefresh={handleRefreshDrafts} />
+      }
+    >
       <TouchableOpacity
         style={styles.backButton}
         onPress={() => setActiveView('menu')}
@@ -223,7 +242,12 @@ export default function ManageTournamentsScreen() {
   );
 
   const renderPast = () => (
-    <ScrollView style={styles.content}>
+    <ScrollView
+      style={styles.content}
+      refreshControl={
+        <RefreshControl refreshing={refreshingPast} onRefresh={handleRefreshPast} />
+      }
+    >
       <TouchableOpacity
         style={styles.backButton}
         onPress={() => setActiveView('menu')}

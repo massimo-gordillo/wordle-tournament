@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, RefreshControl } from 'react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { getTodayDateEST, getTimeUntilCutoff } from '@/lib/dateUtils';
@@ -18,6 +18,7 @@ export default function DailySubmissionScreen() {
   const [todaySubmission, setTodaySubmission] = useState<Submission | null>(null);
   const [timeUntilCutoff, setTimeUntilCutoff] = useState('');
   const [isPastCutoff, setIsPastCutoff] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     loadTodaySubmission();
@@ -37,6 +38,12 @@ export default function DailySubmissionScreen() {
 
     setTimeUntilCutoff(`${hours}h ${minutes}m ${seconds}s until cutoff`);
     setIsPastCutoff(false);
+  };
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await loadTodaySubmission();
+    setRefreshing(false);
   };
 
   const loadTodaySubmission = async () => {
@@ -134,7 +141,12 @@ export default function DailySubmissionScreen() {
 
   if (todaySubmission) {
     return (
-      <ScrollView style={styles.container}>
+      <ScrollView
+        style={styles.container}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+        }
+      >
         <View style={styles.header}>
           <Text style={styles.title}>Today's Submission</Text>
           <Text style={styles.timer}>{timeUntilCutoff}</Text>
@@ -164,7 +176,12 @@ export default function DailySubmissionScreen() {
   }
 
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView
+      style={styles.container}
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+      }
+    >
       <View style={styles.header}>
         <Text style={styles.title}>Daily Wordle Submission</Text>
         <Text style={styles.timer}>{timeUntilCutoff}</Text>

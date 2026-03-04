@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity, RefreshControl } from 'react-native';
 import { useLocalSearchParams, router, useFocusEffect } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
@@ -40,6 +40,7 @@ export default function TournamentDetailScreen() {
   >([]);
   const [loading, setLoading] = useState(true);
   const [resultsReady, setResultsReady] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -190,7 +191,19 @@ export default function TournamentDetailScreen() {
         <Text style={styles.title}>{tournament.name}</Text>
       </View>
 
-      <ScrollView style={styles.content}>
+      <ScrollView
+        style={styles.content}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={async () => {
+              setRefreshing(true);
+              await loadTournamentData();
+              setRefreshing(false);
+            }}
+          />
+        }
+      >
         <View style={styles.infoCard}>
           <Text style={styles.infoLabel}>Status</Text>
           <Text style={styles.infoValue}>{tournament.status.toUpperCase()}</Text>

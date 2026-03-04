@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, RefreshControl } from 'react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { User, LogOut, Save } from 'lucide-react-native';
@@ -11,6 +11,7 @@ export default function AccountScreen() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     loadUserProfile();
@@ -61,6 +62,12 @@ export default function AccountScreen() {
     await signOut();
   };
 
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await loadUserProfile();
+    setRefreshing(false);
+  };
+
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -75,7 +82,12 @@ export default function AccountScreen() {
         <Text style={styles.title}>Account</Text>
       </View>
 
-      <ScrollView style={styles.content}>
+      <ScrollView
+        style={styles.content}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+        }
+      >
         <View style={styles.profileCard}>
           <View style={styles.avatarContainer}>
             <View style={styles.avatar}>

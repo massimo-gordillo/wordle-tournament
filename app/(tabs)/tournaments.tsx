@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, TextInput, ActivityIndicator, Modal } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, TextInput, ActivityIndicator, Modal, RefreshControl } from 'react-native';
 import { router } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
@@ -23,6 +23,7 @@ export default function OngoingTournamentsScreen() {
   const [joinCode, setJoinCode] = useState('');
   const [joinError, setJoinError] = useState('');
   const [joiningTournament, setJoiningTournament] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     loadTournaments();
@@ -55,6 +56,12 @@ export default function OngoingTournamentsScreen() {
     }
 
     setLoading(false);
+  };
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await loadTournaments();
+    setRefreshing(false);
   };
 
   const handleJoinTournament = async () => {
@@ -120,7 +127,12 @@ export default function OngoingTournamentsScreen() {
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.content}>
+      <ScrollView
+        style={styles.content}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+        }
+      >
         {loading ? (
           <ActivityIndicator color="#10b981" style={{ marginTop: 40 }} />
         ) : tournaments.length === 0 ? (
