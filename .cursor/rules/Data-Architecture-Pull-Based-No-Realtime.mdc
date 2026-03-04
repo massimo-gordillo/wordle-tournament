@@ -1,0 +1,23 @@
+---
+alwaysApply: true
+---
+
+This app is intentionally pull-based with no realtime subscriptions.
+
+## Rules
+- Never use Supabase realtime (no `supabase.channel()`, no websocket listeners, no `on('postgres_changes', ...)`)
+- Never implement optimistic UI updates
+- Never push data to the client — all data is fetched on demand
+- UI refreshes on navigation or explicit user action (e.g. pull-to-refresh) only
+- All time-sensitive logic (e.g. cutoff scoring) runs server-side on a schedule, not triggered by client actions
+
+## Rationale
+- Submission model is once-per-day; realtime updates provide no meaningful UX benefit
+- Leaderboard results are intentionally hidden until cutoff or full submission — push updates would undermine this
+- Keeps client logic simple and the architecture easy to reason about
+- Explicitly agreed upon with the client as a design requirement
+
+## Acceptable patterns
+- `supabase.from(...).select(...)` queries on component mount or user-triggered refresh
+- Server-side scheduled functions (e.g. Supabase Edge Functions via cron) for cutoff processing
+- Returning fresh data after a mutation by re-fetching, not by updating local state directly

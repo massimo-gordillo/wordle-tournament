@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity } from 'react-native';
-import { useLocalSearchParams, router } from 'expo-router';
+import { useLocalSearchParams, router, useFocusEffect } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { ChevronLeft, Trophy } from 'lucide-react-native';
@@ -32,47 +32,20 @@ interface Submission {
 
 export default function TournamentDetailScreen() {
   const { id } = useLocalSearchParams();
-  const { user } = useAuth();
   const [tournament, setTournament] = useState<Tournament | null>(null);
   const [scores, setScores] = useState<Score[]>([]);
-  const [yesterdaySubmissions, setYesterdaySubmissions] = useState<Submission[]>([]);
+  const [todaySubmissions, setTodaySubmissions] = useState<Submission[]>([]);
+  const [participants, setParticipants] = useState<
+    { user_id: string; display_name: string; forfeited: boolean }[]
+  >([]);
   const [loading, setLoading] = useState(true);
   const [resultsReady, setResultsReady] = useState(false);
 
-  useEffect(() => {
-    loadTournamentData();
-
-    const channel = supabase
-      .channel('tournament-updates')
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'daily_submissions',
-        },
-        () => {
-          loadTournamentData();
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'tournament_scores',
-          filter: `tournament_id=eq.${id}`,
-        },
-        () => {
-          loadTournamentData();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [id]);
+  useFocusEffect(
+    useCallback(() => {
+      loadTournamentData();
+    }, [id])
+  );
 
 
   const loadTournamentData = async () => {
@@ -88,28 +61,6 @@ export default function TournamentDetailScreen() {
       setTournament(tournamentData);
     }
 
-    const { data: participantsData } = await supabase
-      .from('tournament_participants')
-      .select('user_id')
-      .eq('tournament_id', id);
-
-    const participantIds = participantsData?.map(p => p.user_id) || [];
-
-    const today = getTodayDateEST();
-    const { data: todaySubmissions } = await supabase
-      .from('daily_submissions')
-      .select('user_id')
-      .eq('submission_date', today)
-      .in('user_id', participantIds);
-
-    const submittedUserIds = todaySubmissions?.map(s => s.user_id) || [];
-    const allSubmitted = participantIds.length === submittedUserIds.length;
-
-    const estNow = getDateInEST();
-    const isPastCutoff = estNow.getHours() >= 23;
-
-    setResultsReady(allSubmitted || isPastCutoff);
-
     const { data: allParticipants } = await supabase
       .from('tournament_participants')
       .select('user_id, forfeited')
@@ -118,55 +69,76 @@ export default function TournamentDetailScreen() {
     if (allParticipants) {
       const participantIds = allParticipants.map(p => p.user_id);
 
-      const { data: scoresData } = await supabase
-        .from('tournament_scores')
-        .select('user_id, total_score')
-        .eq('tournament_id', id)
-        .in('user_id', participantIds);
-
       const { data: usersData } = await supabase
         .from('users')
         .select('id, display_name')
         .in('id', participantIds);
 
       const usersMap = new Map(usersData?.map(u => [u.id, u.display_name]));
-      const scoresMap = new Map(scoresData?.map(s => [s.user_id, s.total_score]));
       const forfeitedMap = new Map(allParticipants.map(p => [p.user_id, p.forfeited]));
 
-      const formattedScores = allParticipants
+      const participantDetails = allParticipants.map(p => ({
+        user_id: p.user_id,
+        display_name: usersMap.get(p.user_id) || 'Unknown',
+        forfeited: forfeitedMap.get(p.user_id) || false,
+      }));
+
+      setParticipants(participantDetails);
+
+      // Today's submissions with names
+      const today = getTodayDateEST();
+      const { data: todaySubmissionsData } = await supabase
+        .from('daily_submissions')
+        .select('user_id, submission_text, wordle_score, submission_date')
+        .eq('submission_date', today)
+        .in('user_id', participantIds);
+
+      const submittedUserIds = todaySubmissionsData?.map(s => s.user_id) || [];
+      const allSubmitted = participantIds.length === 0
+        ? false
+        : participantIds.length === submittedUserIds.length;
+
+      const estNow = getDateInEST();
+      const isPastCutoff = estNow.getHours() >= 23;
+
+      const ready = allSubmitted || isPastCutoff;
+      setResultsReady(ready);
+
+      const todaySubmissionsWithNames =
+        todaySubmissionsData?.map(s => ({
+          ...s,
+          display_name: usersMap.get(s.user_id) || 'Unknown',
+        })) ?? [];
+
+      setTodaySubmissions(todaySubmissionsWithNames);
+
+      // Leaderboard: use daily_submissions up to yesterday or today depending on readiness
+      const baseCutoff = ready ? getTodayDateEST() : getYesterdayDateEST();
+      const cutoffDate =
+        baseCutoff < tournamentData.end_date ? baseCutoff : tournamentData.end_date;
+
+      const { data: scoreSubmissions } = await supabase
+        .from('daily_submissions')
+        .select('user_id, wordle_score, submission_date')
+        .in('user_id', participantIds)
+        .gte('submission_date', tournamentData.start_date)
+        .lte('submission_date', cutoffDate);
+
+      const totals = new Map<string, number>();
+      scoreSubmissions?.forEach(s => {
+        totals.set(s.user_id, (totals.get(s.user_id) || 0) + s.wordle_score);
+      });
+
+      const formattedScores = participantDetails
         .map(p => ({
           user_id: p.user_id,
-          total_score: scoresMap.get(p.user_id) || 0,
-          display_name: usersMap.get(p.user_id) || 'Unknown',
-          forfeited: forfeitedMap.get(p.user_id) || false,
+          total_score: p.forfeited ? 0 : totals.get(p.user_id) || 0,
+          display_name: p.display_name,
+          forfeited: p.forfeited,
         }))
         .sort((a, b) => b.total_score - a.total_score);
 
       setScores(formattedScores);
-    }
-
-    const yesterday = getYesterdayDateEST();
-    const { data: submissionsData } = await supabase
-      .from('daily_submissions')
-      .select('user_id, submission_text, wordle_score, submission_date')
-      .eq('submission_date', yesterday)
-      .in('user_id', participantIds);
-
-    if (submissionsData) {
-      const userIds = submissionsData.map(s => s.user_id);
-      const { data: usersData } = await supabase
-        .from('users')
-        .select('id, display_name')
-        .in('id', userIds);
-
-      const usersMap = new Map(usersData?.map(u => [u.id, u.display_name]));
-
-      const formattedSubmissions = submissionsData.map(s => ({
-        ...s,
-        display_name: usersMap.get(s.user_id) || 'Unknown',
-      }));
-
-      setYesterdaySubmissions(formattedSubmissions);
     }
 
     setLoading(false);
@@ -197,6 +169,18 @@ export default function TournamentDetailScreen() {
     );
   }
 
+  const todaySubmittedIds = new Set(todaySubmissions.map(s => s.user_id));
+
+  const getPlayerStatus = (userId: string) => {
+    if (todaySubmittedIds.has(userId)) {
+      return 'Submitted';
+    }
+    if (resultsReady) {
+      return 'No submission';
+    }
+    return 'Waiting';
+  };
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -218,6 +202,18 @@ export default function TournamentDetailScreen() {
           <Text style={styles.infoValue}>{tournament.join_code}</Text>
         </View>
 
+        {participants.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Players</Text>
+            {participants.map(p => (
+              <View key={p.user_id} style={styles.playerRow}>
+                <Text style={styles.playerName}>{p.display_name}</Text>
+                <Text style={styles.playerStatus}>{getPlayerStatus(p.user_id)}</Text>
+              </View>
+            ))}
+          </View>
+        )}
+
         {!resultsReady && tournament.status === 'active' && (
           <View style={styles.waitingCard}>
             <Text style={styles.waitingText}>Waiting for today's submissions...</Text>
@@ -230,6 +226,12 @@ export default function TournamentDetailScreen() {
             <Trophy size={20} color="#1a1a1a" />
             <Text style={styles.sectionTitle}>Leaderboard</Text>
           </View>
+          <Text style={styles.leaderboardStatus}>
+            {resultsReady ? "Today's standings:" : "Today's standings: Waiting"}
+          </Text>
+          <Text style={styles.leaderboardSubtext}>
+            {resultsReady ? "Today's leaderboard" : "Yesterday's leaderboard"}
+          </Text>
 
           {scores.length === 0 ? (
             <Text style={styles.emptyText}>No scores yet</Text>
@@ -251,10 +253,22 @@ export default function TournamentDetailScreen() {
           )}
         </View>
 
-        {yesterdaySubmissions.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Yesterday's Results</Text>
-            {yesterdaySubmissions.map((submission) => (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Today's Results</Text>
+          {todaySubmissions.length === 0 ? (
+            <Text style={styles.emptyText}>No submissions yet today</Text>
+          ) : !resultsReady ? (
+            todaySubmissions.map(submission => (
+              <View key={submission.user_id} style={styles.submissionCard}>
+                <View style={styles.submissionHeader}>
+                  <Text style={styles.submissionName}>{submission.display_name}</Text>
+                  <Text style={styles.submissionScore}>Submitted</Text>
+                </View>
+                <Text style={styles.waitingSubtext}>Waiting for others to submit</Text>
+              </View>
+            ))
+          ) : (
+            todaySubmissions.map(submission => (
               <View key={submission.user_id} style={styles.submissionCard}>
                 <View style={styles.submissionHeader}>
                   <Text style={styles.submissionName}>{submission.display_name}</Text>
@@ -264,9 +278,9 @@ export default function TournamentDetailScreen() {
                   {renderWordleGrid(submission.submission_text)}
                 </View>
               </View>
-            ))}
-          </View>
-        )}
+            ))
+          )}
+        </View>
       </ScrollView>
     </View>
   );
@@ -356,6 +370,16 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#1a1a1a',
   },
+  leaderboardStatus: {
+    fontSize: 14,
+    color: '#4b5563',
+    marginBottom: 4,
+  },
+  leaderboardSubtext: {
+    fontSize: 12,
+    color: '#9ca3af',
+    marginBottom: 12,
+  },
   scoreCard: {
     backgroundColor: '#fff',
     padding: 16,
@@ -432,6 +456,23 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     color: '#10b981',
+  },
+  playerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+  },
+  playerName: {
+    fontSize: 14,
+    color: '#1f2933',
+  },
+  playerStatus: {
+    fontSize: 14,
+    color: '#10b981',
+    fontWeight: '500',
   },
   wordleGrid: {
     alignItems: 'center',
