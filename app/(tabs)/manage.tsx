@@ -258,10 +258,12 @@ export default function ManageTournamentsScreen() {
             onPress={() => router.push(`/draft-tournament/${tournament.id}`)}
           >
             <View style={styles.tournamentHeader}>
-              <Text style={styles.tournamentName}>{tournament.name}</Text>
-              <View style={[styles.statusBadge, { backgroundColor: '#f59e0b' }]}>
-                <Text style={styles.statusText}>DRAFT</Text>
-              </View>
+            <Text style={styles.tournamentName}>
+              {tournament.name === `${userDisplayName}'s tournament` ? 'Your tournament' : tournament.name}
+            </Text>
+            <View style={[styles.statusBadge, { backgroundColor: '#f59e0b' }]}>
+              <Text style={styles.statusText}>DRAFT</Text>
+            </View>
             </View>
             <Text style={styles.tournamentDate}>
               {new Date(tournament.start_date).toLocaleDateString()} - {new Date(tournament.end_date).toLocaleDateString()}

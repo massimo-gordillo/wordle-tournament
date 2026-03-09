@@ -71,7 +71,10 @@ export default function StatisticsScreen() {
     const { data: participations } = await supabase
       .from('tournament_participants')
       .select('tournament_id')
-      .eq('user_id', user.id);
+      .eq('user_id', user.id)
+      .neq('tournament_id', 'draft')
+      .neq('tournament_id', 'cancelled');
+
 
     setStats({
       averageScore: Math.round(averageScore * 10) / 10,
