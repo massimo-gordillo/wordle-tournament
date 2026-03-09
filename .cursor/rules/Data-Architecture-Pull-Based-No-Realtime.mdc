@@ -21,3 +21,8 @@ This app is intentionally pull-based with no realtime subscriptions.
 - `supabase.from(...).select(...)` queries on component mount or user-triggered refresh
 - Server-side scheduled functions (e.g. Supabase Edge Functions via cron) for cutoff processing
 - Returning fresh data after a mutation by re-fetching, not by updating local state directly
+- pull-to-refresh via RefreshControl is the preferred explicit refresh mechanism for list screens.
+
+
+## Development
+- Any debug logging or dev-only UI should be gated behind __DEV__ checks. Create a utils/logger.ts with a devLog utility and use that instead of raw console.log throughout the app.
