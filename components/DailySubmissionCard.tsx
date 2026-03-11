@@ -37,34 +37,40 @@ export function DailySubmissionCard({
   };
 
   return (
-    <View style={styles.card}>
-      {dateLabel ? <Text style={styles.dateLabel}>{dateLabel}</Text> : null}
-      <View style={styles.headerRow}>
-        {playerName ? (
-          <Text style={styles.nameText}>{playerName}</Text>
-        ) : (
-          <Text style={styles.nameText}>Today</Text>
-        )}
-        <Text style={styles.statusText}>
-          {didSubmit && typeof score === 'number' ? `${score} pts` : 'Did not submit'}
-        </Text>
+    <View style={styles.container}>
+      <View style={styles.card}>
+        {dateLabel ? <Text style={styles.dateLabel}>{dateLabel}</Text> : null}
+        <View style={styles.headerRow}>
+          {playerName ? (
+            <Text style={styles.nameText}>{playerName}</Text>
+          ) : (
+            <Text style={styles.nameText}>Today</Text>
+          )}
+          <Text style={styles.statusText}>
+            {didSubmit && typeof score === 'number' ? `${score} pts` : 'Did not submit'}
+          </Text>
+        </View>
+        {didSubmit && submissionText ? renderWordleGrid(submissionText) : null}
       </View>
-      {didSubmit && submissionText ? renderWordleGrid(submissionText) : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  container: {
+    paddingHorizontal: 64,
+  },
   card: {
     backgroundColor: '#fff',
     borderRadius: 12,
-    padding: 16,
+    padding: 12,
     marginBottom: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+    paddingBottom: 16,
   },
   dateLabel: {
     fontSize: 12,
@@ -88,13 +94,13 @@ const styles = StyleSheet.create({
     color: '#4b5563',
   },
   wordleGrid: {
-    marginTop: 8,
+    marginTop: 0,
     alignItems: 'center',
   },
   wordleRow: {
-    fontSize: 24,
-    marginBottom: 4,
-    letterSpacing: 4,
+    fontSize: 20,
+    marginBottom: 1,
+    letterSpacing: 1,
   },
 });
 

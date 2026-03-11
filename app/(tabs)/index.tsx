@@ -365,13 +365,15 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: '#10b981',
     padding: 24,
-    paddingTop: 60,
+    paddingTop: 30,
+    paddingBottom: 10,
+    height: 110,
   },
   title: {
     fontSize: 28,
     fontWeight: 'bold',
     color: '#fff',
-    marginBottom: 8,
+    marginBottom: 0,
   },
   timer: {
     fontSize: 16,

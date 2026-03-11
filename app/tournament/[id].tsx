@@ -178,6 +178,21 @@ export default function TournamentDetailScreen() {
 
   const isCompleted = tournament.status === 'closed';
 
+  const handleBack = () => {
+    if (router.canGoBack && router.canGoBack()) {
+      router.back();
+      return;
+    }
+
+    if (tournament.status === 'active') {
+      router.replace('/(tabs)/tournaments');
+    } else if (tournament.status === 'closed') {
+      router.replace('/(tabs)/manage');
+    } else {
+      router.replace('/(tabs)/tournaments');
+    }
+  };
+
   const getPlayerStatus = (userId: string) => {
     if (todaySubmittedIds.has(userId)) {
       return 'Submitted';
@@ -191,7 +206,7 @@ export default function TournamentDetailScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+        <TouchableOpacity onPress={handleBack} style={styles.backButton}>
           <ChevronLeft size={24} color="#fff" />
         </TouchableOpacity>
         <Text style={styles.title}>{tournament.name}</Text>
@@ -221,17 +236,7 @@ export default function TournamentDetailScreen() {
           <Text style={styles.infoValue}>{tournament.join_code}</Text>
         </View>
 
-        {participants.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Players</Text>
-            {participants.map(p => (
-              <View key={p.user_id} style={styles.playerRow}>
-                <Text style={styles.playerName}>{p.display_name}</Text>
-                <Text style={styles.playerStatus}>{getPlayerStatus(p.user_id)}</Text>
-              </View>
-            ))}
-          </View>
-        )}
+        
 
         {!resultsReady && tournament.status === 'active' && (
           <View style={styles.waitingCard}>
@@ -252,6 +257,8 @@ export default function TournamentDetailScreen() {
             </Text>
           </View>
 
+          
+
           {scores.length === 0 ? (
             <Text style={styles.emptyText}>No scores yet</Text>
           ) : (
@@ -271,6 +278,18 @@ export default function TournamentDetailScreen() {
             ))
           )}
         </View>
+
+        {participants.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Players</Text>
+            {participants.map(p => (
+              <View key={p.user_id} style={styles.playerRow}>
+                <Text style={styles.playerName}>{p.display_name}</Text>
+                <Text style={styles.playerStatus}>{getPlayerStatus(p.user_id)}</Text>
+              </View>
+            ))}
+          </View>
+        )}
 
         {/* All Results section */}
         <View style={styles.section}>
@@ -361,7 +380,7 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: '#10b981',
     padding: 24,
-    paddingTop: 60,
+    paddingTop: 40,
     flexDirection: 'row',
     alignItems: 'center',
   },
@@ -380,7 +399,10 @@ const styles = StyleSheet.create({
   infoCard: {
     backgroundColor: '#fff',
     margin: 16,
-    padding: 20,
+    marginBottom: 16,
+    marginTop: 8,
+    padding: 4,
+    paddingHorizontal: 16,
     borderRadius: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -391,19 +413,20 @@ const styles = StyleSheet.create({
   infoLabel: {
     fontSize: 12,
     color: '#666',
-    marginBottom: 4,
-    marginTop: 8,
+    marginTop: 4,
   },
   infoValue: {
     fontSize: 16,
     color: '#1a1a1a',
     fontWeight: '500',
+    marginBottom: 6,
   },
   waitingCard: {
     backgroundColor: '#fef3c7',
     marginHorizontal: 16,
-    marginBottom: 16,
-    padding: 16,
+    marginBottom: 0,
+    padding: 8,
+    paddingHorizontal: 16,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: '#fbbf24',

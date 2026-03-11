@@ -176,7 +176,10 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: '#10b981',
     padding: 24,
-    paddingTop: 60,
+    paddingTop: 30,
+    paddingBottom: 10,
+    height: 110,
+    
   },
   title: {
     fontSize: 28,

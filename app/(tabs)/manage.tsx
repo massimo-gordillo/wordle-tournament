@@ -461,8 +461,9 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: '#10b981',
     padding: 24,
-    paddingTop: 60,
-    paddingBottom: 24,
+    paddingTop: 30,
+    paddingBottom: 10,
+    height: 110,
   },
   title: {
     fontSize: 28,
@@ -471,7 +472,7 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    padding: 16,
+    padding: 8,
   },
   menuGrid: {
     gap: 16,

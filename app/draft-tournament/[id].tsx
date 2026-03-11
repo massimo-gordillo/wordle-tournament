@@ -193,11 +193,24 @@ export default function DraftTournamentScreen() {
   const canStart = participants.length >= 2;
   const isCreator = user?.id != null && tournament.created_by === user.id;
 
+  const handleBack = () => {
+    if (router.canGoBack && router.canGoBack()) {
+      router.back();
+      return;
+    }
+
+    if (isCreator) {
+      router.replace('/(tabs)/manage');
+    } else {
+      router.replace('/(tabs)/tournaments');
+    }
+  };
+
   if (!isCreator) {
     return (
       <View style={styles.container}>
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+          <TouchableOpacity onPress={handleBack} style={styles.backButton}>
             <ChevronLeft size={24} color="#fff" />
           </TouchableOpacity>
           <Text style={styles.title}>{tournament.name}</Text>
@@ -269,7 +282,7 @@ export default function DraftTournamentScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+        <TouchableOpacity onPress={handleBack} style={styles.backButton}>
           <ChevronLeft size={24} color="#fff" />
         </TouchableOpacity>
         <Text style={styles.title}>{tournament.name}</Text>
