@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase';
 import { useAppConfig } from '@/contexts/ConfigContext';
 import { TournamentListItem } from '@/components/TournamentListItem';
 import { Search } from 'lucide-react-native';
+import { formatDateShort } from '@/utils/dateUtils';
 
 interface Tournament {
   id: string;
@@ -214,7 +215,7 @@ export default function OngoingTournamentsScreen() {
                       (end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24),
                     );
                     const durationLabel = durationDays.toString();
-                    const endDateLabel = end.toLocaleDateString();
+                    const endDateLabel = formatDateShort(end);
 
                     return (
                       <TournamentListItem
@@ -259,7 +260,7 @@ export default function OngoingTournamentsScreen() {
                       (end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24),
                     );
                     const durationLabel = durationDays.toString();
-                    const endDateLabel = end.toLocaleDateString();
+                    const endDateLabel = formatDateShort(end);
 
                     return (
                       <TournamentListItem

@@ -39,7 +39,9 @@ export function DailySubmissionCard({
   return (
     <View style={styles.container}>
       <View style={styles.card}>
-        {dateLabel ? <Text style={styles.dateLabel}>{dateLabel}</Text> : null}
+        {
+        //{dateLabel ? <Text style={styles.dateLabel}>{dateLabel}</Text> : null}
+        }
         <View style={styles.headerRow}>
           {playerName ? (
             <Text style={styles.nameText}>{playerName}</Text>
@@ -47,7 +49,7 @@ export function DailySubmissionCard({
             <Text style={styles.nameText}>Today</Text>
           )}
           <Text style={styles.statusText}>
-            {didSubmit && typeof score === 'number' ? `${score} pts` : 'Did not submit'}
+            {didSubmit && typeof score === 'number' ? `${score} pts` : 'Did not submit (-2)'}
           </Text>
         </View>
         {didSubmit && submissionText ? renderWordleGrid(submissionText) : null}
@@ -70,7 +72,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
-    paddingBottom: 16,
   },
   dateLabel: {
     fontSize: 12,

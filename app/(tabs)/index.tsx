@@ -335,7 +335,7 @@ export default function DailySubmissionScreen() {
         </TouchableOpacity>
       </View>
 
-      <View style={styles.scoringCard}>
+      {/*<View style={styles.scoringCard}>
         <Text style={styles.scoringTitle}>Scoring System</Text>
         <View style={styles.scoringRow}>
           <Text style={styles.scoringText}>1 guess: {config?.pointsGuess1 ?? 20} points</Text>
@@ -352,7 +352,7 @@ export default function DailySubmissionScreen() {
         <Text style={styles.scoringText}>
           No submission: {config?.pointsMissed ?? -2} points
         </Text>
-      </View>
+      </View>*/}
     </ScrollView>
   );
 }
@@ -368,6 +368,7 @@ const styles = StyleSheet.create({
     paddingTop: 30,
     paddingBottom: 10,
     height: 110,
+    marginBottom: 16,
   },
   title: {
     fontSize: 28,
@@ -383,6 +384,7 @@ const styles = StyleSheet.create({
   instructionsCard: {
     backgroundColor: '#fff',
     margin: 16,
+    marginTop: 0,
     padding: 20,
     borderRadius: 12,
     shadowColor: '#000',

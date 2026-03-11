@@ -5,6 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { ChevronLeft, Trophy } from 'lucide-react-native';
 import { getTodayDateEST, getYesterdayDateEST, getDateInEST } from '@/lib/dateUtils';
+import { formatDateShort } from '@/utils/dateUtils';
 import { DailySubmissionCard } from '@/components/DailySubmissionCard';
 
 interface Tournament {
@@ -32,6 +33,7 @@ interface Submission {
 }
 
 export default function TournamentDetailScreen() {
+  const { user } = useAuth();
   const { id } = useLocalSearchParams();
   const [tournament, setTournament] = useState<Tournament | null>(null);
   const [scores, setScores] = useState<Score[]>([]);
@@ -209,7 +211,12 @@ export default function TournamentDetailScreen() {
         <TouchableOpacity onPress={handleBack} style={styles.backButton}>
           <ChevronLeft size={24} color="#fff" />
         </TouchableOpacity>
-        <Text style={styles.title}>{tournament.name}</Text>
+        <View style={styles.headerText}>
+          <Text style={styles.title}>{tournament.name}</Text>
+          <Text style={styles.headerDate}>{`Ends on ${formatDateShort(
+            tournament.end_date,
+          )}`}</Text>
+        </View>
       </View>
 
       <ScrollView
@@ -225,16 +232,7 @@ export default function TournamentDetailScreen() {
           />
         }
       >
-        <View style={styles.infoCard}>
-          <Text style={styles.infoLabel}>Status</Text>
-          <Text style={styles.infoValue}>{tournament.status.toUpperCase()}</Text>
-          <Text style={styles.infoLabel}>Duration</Text>
-          <Text style={styles.infoValue}>
-            {new Date(tournament.start_date).toLocaleDateString()} - {new Date(tournament.end_date).toLocaleDateString()}
-          </Text>
-          <Text style={styles.infoLabel}>Join Code</Text>
-          <Text style={styles.infoValue}>{tournament.join_code}</Text>
-        </View>
+
 
         
 
@@ -269,7 +267,7 @@ export default function TournamentDetailScreen() {
                 </View>
                 <View style={styles.scoreInfo}>
                   <Text style={styles.scoreName}>
-                    {score.display_name}
+                  {score.display_name}{score.user_id === user?.id ? ' (You)' : ''}
                     {score.forfeited && <Text style={styles.forfeitedText}> (Forfeited)</Text>}
                   </Text>
                 </View>
@@ -336,7 +334,7 @@ export default function TournamentDetailScreen() {
                   return (
                     <View key={date} style={styles.resultsDay}>
                       <Text style={styles.resultsDayTitle}>
-                        {new Date(date).toLocaleDateString()}
+                        {formatDateShort(date)}
                       </Text>
                       <View style={styles.resultsDayDivider} />
                       {participants.map(p => {
@@ -362,8 +360,25 @@ export default function TournamentDetailScreen() {
             </>
           )}
         </View>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Tournament Info</Text>
+          <View style={styles.infoCard}>
+            
+            <Text style={styles.infoLabel}>Status</Text>
+            <Text style={styles.infoValue}>{tournament.status.toUpperCase()}</Text>
+            <Text style={styles.infoLabel}>Dates</Text>
+            <Text style={styles.infoValue}>
+              {formatDateShort(tournament.start_date)} - {formatDateShort(
+                tournament.end_date,
+              )}
+            </Text>
+            <Text style={styles.infoLabel}>Join Code</Text>
+            <Text style={styles.infoValue}>{tournament.join_code}</Text>
+          </View>
+        </View>
       </ScrollView>
     </View>
+    
   );
 }
 
@@ -383,6 +398,15 @@ const styles = StyleSheet.create({
     paddingTop: 40,
     flexDirection: 'row',
     alignItems: 'center',
+    marginBottom: 16,
+  },
+  headerDate: {
+    fontSize: 24,
+    color: '#fff',
+  },
+  headerText: {
+    flexDirection: 'column',
+    alignItems: 'flex-start',
   },
   backButton: {
     marginRight: 12,
