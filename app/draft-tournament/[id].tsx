@@ -131,10 +131,11 @@ export default function DraftTournamentScreen() {
 
     const originalStartDate = new Date(tournament.start_date);
     const originalEndDate = new Date(tournament.end_date);
-    const durationDays = Math.round((originalEndDate.getTime() - originalStartDate.getTime()) / (1000 * 60 * 60 * 24));
+    const calendarDays =
+      Math.round((originalEndDate.getTime() - originalStartDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
 
     const newEndDate = new Date(today);
-    newEndDate.setDate(newEndDate.getDate() + durationDays);
+    newEndDate.setDate(newEndDate.getDate() + calendarDays - 1);
 
     const { error } = await supabase
       .from('tournaments')
@@ -241,7 +242,8 @@ export default function DraftTournamentScreen() {
               {(() => {
                 const start = new Date(tournament.start_date);
                 const end = new Date(tournament.end_date);
-                const days = Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+                const days =
+                  Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
                 if (days === 3) return '3 days';
                 if (days === 7) return '7 days';
                 if (days === 14) return '2 weeks';

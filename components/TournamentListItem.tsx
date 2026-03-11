@@ -1,6 +1,5 @@
 import React from 'react';
 import { TouchableOpacity, View, Text, StyleSheet, GestureResponderEvent } from 'react-native';
-import { formatDateShort } from '@/utils/dateUtils';
 
 type Props = {
   title: string;
@@ -34,7 +33,7 @@ export function TournamentListItem({
       <Text style={styles.dateText}>{`Duration: ${durationLabel} ${durationLabel === "1" ? 'day' : 'days'}`}</Text>
 
      {endDateLabel ? (
-        <Text style={styles.dateText}>{`Ends: ${formatDateShort(endDateLabel)}`}</Text>
+        <Text style={styles.dateText}>{`Ends: ${endDateLabel}`}</Text>
       ) : null}
       {secondaryText ? <Text style={styles.secondaryText}>{secondaryText}</Text> : null}
     </TouchableOpacity>

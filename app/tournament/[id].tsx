@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity, RefreshControl, Alert, Platform } from 'react-native';
 import { useLocalSearchParams, router, useFocusEffect } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
@@ -45,6 +45,7 @@ export default function TournamentDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [resultsReady, setResultsReady] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [forfeitLoading, setForfeitLoading] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -117,14 +118,19 @@ export default function TournamentDetailScreen() {
       );
 
       const submittedUserIds = todaySubmissionsData.map(s => s.user_id);
-      const allSubmitted = participantIds.length === 0
-        ? false
-        : participantIds.length === submittedUserIds.length;
+      // Exclude forfeited players: results unlock when all active participants have submitted (or at 11 PM EST)
+      const activeParticipantIds = allParticipants
+        .filter(p => !forfeitedMap.get(p.user_id))
+        .map(p => p.user_id);
+      const allActiveSubmitted =
+        activeParticipantIds.length === 0
+          ? false
+          : activeParticipantIds.every(uid => submittedUserIds.includes(uid));
 
       const estNow = getDateInEST();
       const isPastCutoff = estNow.getHours() >= 23;
 
-      const ready = allSubmitted || isPastCutoff;
+      const ready = allActiveSubmitted || isPastCutoff;
       setResultsReady(ready);
 
       setTodaySubmissions(todaySubmissionsData);
@@ -148,11 +154,15 @@ export default function TournamentDetailScreen() {
       const formattedScores = participantDetails
         .map(p => ({
           user_id: p.user_id,
-          total_score: p.forfeited ? 0 : totals.get(p.user_id) || 0,
+          total_score: p.forfeited ? -1 : totals.get(p.user_id) || 0,
           display_name: p.display_name,
           forfeited: p.forfeited,
         }))
-        .sort((a, b) => b.total_score - a.total_score);
+        .sort((a, b) => {
+          if (a.forfeited && !b.forfeited) return 1;
+          if (!a.forfeited && b.forfeited) return -1;
+          return b.total_score - a.total_score;
+        });
 
       setScores(formattedScores);
     }
@@ -196,6 +206,10 @@ export default function TournamentDetailScreen() {
   };
 
   const getPlayerStatus = (userId: string) => {
+    const participant = participants.find(p => p.user_id === userId);
+    if (participant?.forfeited) {
+      return 'Forfeited';
+    }
     if (todaySubmittedIds.has(userId)) {
       return 'Submitted';
     }
@@ -203,6 +217,50 @@ export default function TournamentDetailScreen() {
       return 'No submission';
     }
     return 'Waiting';
+  };
+
+  const handleConfirmForfeit = async () => {
+    if (!user || !id) return;
+    try {
+      setForfeitLoading(true);
+      const { error } = await supabase.rpc('forfeit_tournament', {
+        p_tournament_id: id,
+      });
+
+      if (error) {
+        if (error.message?.includes('ALREADY_FORFEITED') || error.message?.toLowerCase().includes('already forfeited')) {
+          Alert.alert('Already forfeited', 'You have already forfeited this tournament.');
+        } else {
+          Alert.alert('Error', 'Could not forfeit the tournament. Please try again.');
+        }
+        return;
+      }
+
+      await loadTournamentData();
+    } finally {
+      setForfeitLoading(false);
+    }
+  };
+
+  const handleForfeitPress = () => {
+    if (Platform.OS === 'web') {
+      const confirmed = window.confirm(
+        'Are you sure you want to forfeit this tournament? This will set your score to -1 and cannot be undone.',
+      );
+      if (confirmed) {
+        handleConfirmForfeit();
+      }
+      return;
+    }
+
+    Alert.alert(
+      'Forfeit Tournament',
+      'Are you sure you want to forfeit this tournament? This will set your score to -1 and cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Forfeit', style: 'destructive', onPress: handleConfirmForfeit },
+      ],
+    );
   };
 
   return (
@@ -239,7 +297,7 @@ export default function TournamentDetailScreen() {
         {!resultsReady && tournament.status === 'active' && (
           <View style={styles.waitingCard}>
             <Text style={styles.waitingText}>Waiting for today's submissions...</Text>
-            <Text style={styles.waitingSubtext}>Results will be available after all players submit or at 11 PM EST</Text>
+            <Text style={styles.waitingSubtext}>Results will be available after all active players submit or at 11 PM EST</Text>
           </View>
         )}
 
@@ -271,7 +329,9 @@ export default function TournamentDetailScreen() {
                     {score.forfeited && <Text style={styles.forfeitedText}> (Forfeited)</Text>}
                   </Text>
                 </View>
-                <Text style={styles.scorePoints}>{score.total_score} pts</Text>
+                <Text style={styles.scorePoints}>
+                  {score.forfeited ? 'Forfeited' : `${score.total_score} pts`}
+                </Text>
               </View>
             ))
           )}
@@ -282,7 +342,7 @@ export default function TournamentDetailScreen() {
             <Text style={styles.sectionTitle}>Players</Text>
             {participants.map(p => (
               <View key={p.user_id} style={styles.playerRow}>
-                <Text style={styles.playerName}>{p.display_name}</Text>
+                <Text style={styles.playerName}>{p.display_name}{p.user_id === user?.id ? ' (You)' : ''}</Text>
                 <Text style={styles.playerStatus}>{getPlayerStatus(p.user_id)}</Text>
               </View>
             ))}
@@ -388,6 +448,20 @@ export default function TournamentDetailScreen() {
             <Text style={styles.infoValue}>{tournament.join_code}</Text>
           </View>
         </View>
+        {tournament.status === 'active' &&
+          participants.some(p => p.user_id === user?.id && !p.forfeited) && (
+            <View style={styles.section}>
+              <TouchableOpacity
+                style={[styles.forfeitButton, forfeitLoading && { opacity: 0.7 }]}
+                onPress={handleForfeitPress}
+                disabled={forfeitLoading}
+              >
+                <Text style={styles.forfeitButtonText}>
+                  {forfeitLoading ? 'Forfeiting...' : 'Forfeit Tournament'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
       </ScrollView>
     </View>
     
@@ -406,11 +480,12 @@ const styles = StyleSheet.create({
   },
   header: {
     backgroundColor: '#10b981',
-    padding: 24,
-    paddingTop: 40,
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 16,
+    padding: 24,
+    paddingTop: 40,
+    paddingBottom: 20,
   },
   headerDate: {
     fontSize: 24,
@@ -617,5 +692,22 @@ const styles = StyleSheet.create({
     fontSize: 20,
     marginBottom: 2,
     letterSpacing: 4,
+  },
+  forfeitButton: {
+    backgroundColor: '#ef4444',
+    paddingVertical: 14,
+    borderRadius: 999,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  forfeitButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });

@@ -154,7 +154,8 @@ export default function ManageTournamentsScreen() {
     today.setHours(0, 0, 0, 0);
 
     const endDate = new Date(today);
-    endDate.setDate(endDate.getDate() + duration.days);
+    // Duration is inclusive of start day: e.g. 3 days starting Mar 11 → end Mar 13 (submit on 11, 12, 13)
+    endDate.setDate(endDate.getDate() + duration.days - 1);
 
     const tournamentName = `${userDisplayName}'s tournament`;
 
@@ -257,9 +258,8 @@ export default function ManageTournamentsScreen() {
         draftTournaments.map(tournament => {
           const start = new Date(tournament.start_date);
           const end = new Date(tournament.end_date);
-          const durationDays = Math.round(
-            (end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24),
-          );
+          const calendarDays =
+            Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
 
           return (
             <TournamentListItem
@@ -267,7 +267,7 @@ export default function ManageTournamentsScreen() {
               title={tournament.created_by === user?.id ? 'Your Tournament' : tournament.name}
               statusLabel="Draft"
               statusColor="#f59e0b"
-              durationLabel={durationDays.toString()}
+              durationLabel={calendarDays.toString()}
               secondaryText={`Join Code: ${tournament.join_code}`}
               onPress={() => router.push(`/draft-tournament/${tournament.id}`)}
             />
@@ -302,9 +302,8 @@ export default function ManageTournamentsScreen() {
         pastTournaments.map(tournament => {
           const start = new Date(tournament.start_date);
           const end = new Date(tournament.end_date);
-          const durationDays = Math.round(
-            (end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24),
-          );
+          const calendarDays =
+            Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
 
           return (
             <TournamentListItem
@@ -312,7 +311,7 @@ export default function ManageTournamentsScreen() {
               title={tournament.name}
               statusLabel="Closed"
               statusColor="#6b7280"
-              durationLabel={durationDays.toString()}
+              durationLabel={calendarDays.toString()}
               onPress={() => router.push(`/tournament/${tournament.id}`)}
             />
           );
@@ -461,9 +460,8 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: '#10b981',
     padding: 24,
-    paddingTop: 30,
-    paddingBottom: 10,
-    height: 110,
+    paddingTop: 40,
+    paddingBottom: 20,
   },
   title: {
     fontSize: 28,

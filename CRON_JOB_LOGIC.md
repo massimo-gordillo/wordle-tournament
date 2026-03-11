@@ -67,8 +67,8 @@ BEGIN
     tp.tournament_id,
     tp.user_id,
     CASE
-      -- If forfeited, score is 0
-      WHEN tp.forfeited THEN 0
+      -- If forfeited, score is -1 (displayed as "Forfeited")
+      WHEN tp.forfeited THEN -1
       -- Otherwise sum all daily scores within tournament date range
       ELSE COALESCE(SUM(ds.wordle_score), 0)
     END as total_score,

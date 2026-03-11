@@ -211,10 +211,9 @@ export default function OngoingTournamentsScreen() {
                   ongoingTournaments.map(tournament => {
                     const start = new Date(tournament.start_date);
                     const end = new Date(tournament.end_date);
-                    const durationDays = Math.round(
-                      (end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24),
-                    );
-                    const durationLabel = durationDays.toString();
+                    const calendarDays =
+                      Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+                    const durationLabel = calendarDays.toString();
                     const endDateLabel = formatDateShort(end);
 
                     return (
@@ -256,10 +255,9 @@ export default function OngoingTournamentsScreen() {
                   recentlyCompletedTournaments.map(tournament => {
                     const start = new Date(tournament.start_date);
                     const end = new Date(tournament.end_date);
-                    const durationDays = Math.round(
-                      (end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24),
-                    );
-                    const durationLabel = durationDays.toString();
+                    const calendarDays =
+                      Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+                    const durationLabel = calendarDays.toString();
                     const endDateLabel = formatDateShort(end);
 
                     return (
@@ -377,15 +375,14 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: '#10b981',
     padding: 24,
-    paddingTop: 20,
-    paddingBottom: 10,
-    height: 110,
+    paddingTop: 40,
+    paddingBottom: 20,
   },
   title: {
     fontSize: 28,
     fontWeight: 'bold',
     color: '#fff',
-    marginBottom: 8,
+    marginBottom: 10,
   },
   joinButton: {
     flexDirection: 'row',
