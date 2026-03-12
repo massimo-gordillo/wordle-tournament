@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, TextInput, ActivityIndicator, Modal, RefreshControl } from 'react-native';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { useAppConfig } from '@/contexts/ConfigContext';
@@ -22,6 +22,7 @@ export default function OngoingTournamentsScreen() {
   const { user } = useAuth();
   const { config } = useAppConfig();
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
+  const [forfeitedTournamentIds, setForfeitedTournamentIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [joinModalVisible, setJoinModalVisible] = useState(false);
   const [joinCode, setJoinCode] = useState('');
@@ -37,16 +38,25 @@ export default function OngoingTournamentsScreen() {
     loadTournaments();
   }, []);
 
+  useFocusEffect(
+    useCallback(() => {
+      if (user) loadTournaments();
+    }, [user]),
+  );
+
   const loadTournaments = async () => {
     if (!user) return;
 
     const { data: participantData } = await supabase
       .from('tournament_participants')
-      .select('tournament_id')
+      .select('tournament_id, forfeited')
       .eq('user_id', user.id);
-      
 
     const tournamentIds = participantData?.map(p => p.tournament_id) || [];
+    const forfeitedIds = new Set(
+      participantData?.filter(p => p.forfeited).map(p => p.tournament_id) ?? [],
+    );
+    setForfeitedTournamentIds(forfeitedIds);
 
     if (tournamentIds.length === 0) {
       setLoading(false);
@@ -154,9 +164,11 @@ export default function OngoingTournamentsScreen() {
   const now = new Date();
   const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
 
-  const ongoingTournaments = tournaments.filter(t => t.status === 'active');
+  const ongoingTournaments = tournaments.filter(
+    t => t.status === 'active' && !forfeitedTournamentIds.has(t.id),
+  );
   const recentlyCompletedTournaments = tournaments.filter(t => {
-    if (t.status !== 'closed') return false;
+    if (t.status !== 'closed' || forfeitedTournamentIds.has(t.id)) return false;
     const end = new Date(t.end_date);
     return now.getTime() - end.getTime() < sevenDaysMs;
   });

@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase';
 import { Plus, FileText, History, ChevronDown } from 'lucide-react-native';
 import { useAppConfig } from '@/contexts/ConfigContext';
 import { devLog } from '@/utils/logger';
+import { formatDateShort } from '@/utils/dateUtils';
 import { TournamentListItem } from '@/components/TournamentListItem';
 
 interface Tournament {
@@ -19,6 +20,9 @@ interface Tournament {
   join_code: string;
   created_at: string;
 }
+
+/** Past list item: tournament plus whether the current user forfeited it */
+type PastTournamentItem = { tournament: Tournament; iForfeited: boolean };
 
 type DurationOption = {
   label: string;
@@ -37,7 +41,7 @@ export default function ManageTournamentsScreen() {
   const { config } = useAppConfig();
   const [activeView, setActiveView] = useState<'menu' | 'drafts' | 'past'>('menu');
   const [draftTournaments, setDraftTournaments] = useState<Tournament[]>([]);
-  const [pastTournaments, setPastTournaments] = useState<Tournament[]>([]);
+  const [pastTournaments, setPastTournaments] = useState<PastTournamentItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [createModalVisible, setCreateModalVisible] = useState(false);
 
@@ -91,17 +95,47 @@ export default function ManageTournamentsScreen() {
     if (!user) return;
     setLoading(true);
 
-    const { data, error } = await supabase
-      .from('tournaments')
-      .select('*')
-      .eq('created_by', user.id)
-      .eq('status', 'closed')
-      .order('created_at', { ascending: false });
+    const { data: participations } = await supabase
+      .from('tournament_participants')
+      .select('tournament_id, forfeited')
+      .eq('user_id', user.id);
 
-    if (!error && data) {
-      setPastTournaments(data);
+    const tournamentIds = participations?.map(p => p.tournament_id) ?? [];
+    const forfeitedByTournamentId = new Map(
+      participations?.map(p => [p.tournament_id, p.forfeited === true]) ?? [],
+    );
+
+    if (tournamentIds.length === 0) {
+      setPastTournaments([]);
+      setLoading(false);
+      return;
     }
 
+    const { data: tournamentsData, error } = await supabase
+      .from('tournaments')
+      .select('*')
+      .in('id', tournamentIds)
+      .in('status', ['active', 'closed'])
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      setPastTournaments([]);
+      setLoading(false);
+      return;
+    }
+
+    const items: PastTournamentItem[] = (tournamentsData ?? [])
+      .filter(t => t.status === 'closed' || forfeitedByTournamentId.get(t.id))
+      .map(t => ({
+        tournament: t as Tournament,
+        iForfeited: forfeitedByTournamentId.get(t.id) ?? false,
+      }))
+      .sort(
+        (a, b) =>
+          new Date(b.tournament.created_at).getTime() - new Date(a.tournament.created_at).getTime(),
+      );
+
+    setPastTournaments(items);
     setLoading(false);
   };
 
@@ -296,22 +330,24 @@ export default function ManageTournamentsScreen() {
       ) : pastTournaments.length === 0 ? (
         <View style={styles.emptyState}>
           <Text style={styles.emptyText}>No past tournaments</Text>
-          <Text style={styles.emptySubtext}>Completed tournaments will appear here</Text>
+          <Text style={styles.emptySubtext}>Tournaments you participated in will appear here once they end or if you forfeit</Text>
         </View>
       ) : (
-        pastTournaments.map(tournament => {
+        pastTournaments.map(({ tournament, iForfeited }) => {
           const start = new Date(tournament.start_date);
           const end = new Date(tournament.end_date);
           const calendarDays =
             Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+          const showForfeitedLabel = iForfeited && tournament.status === 'active';
 
           return (
             <TournamentListItem
               key={tournament.id}
-              title={tournament.name}
-              statusLabel="Closed"
-              statusColor="#6b7280"
+              title={tournament.created_by === user?.id ? "Your Tournament" : tournament.name}
+              statusLabel={showForfeitedLabel ? 'Forfeited' : 'Closed'}
+              statusColor={showForfeitedLabel ? '#ef4444' : '#6b7280'}
               durationLabel={calendarDays.toString()}
+              endDateLabel={formatDateShort(tournament.end_date)}
               onPress={() => router.push(`/tournament/${tournament.id}`)}
             />
           );
