@@ -109,6 +109,38 @@ export default function DraftTournamentScreen() {
     }
   };
 
+  const handleKickParticipant = (participant: Participant) => {
+    if (!tournament || participant.user_id === user?.id) return;
+
+    const confirmAndKick = async () => {
+      await supabase.rpc('kick_tournament_participant', {
+        p_tournament_id: tournament.id,
+        p_user_id: participant.user_id,
+      });
+
+      await loadParticipants();
+    };
+
+    if (Platform.OS === 'web' && typeof window !== 'undefined' && window.confirm) {
+      const ok = window.confirm(
+        `Remove ${participant.display_name} from this tournament?\n\nThey will not be able to re-join.`,
+      );
+      if (ok) {
+        void confirmAndKick();
+      }
+      return;
+    }
+
+    Alert.alert(
+      'Remove player',
+      'Remove this player from the tournament? They will not be able to re-join.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Remove', style: 'destructive', onPress: () => void confirmAndKick() },
+      ],
+    );
+  };
+
   const handleCopyCode = () => {
     if (!tournament) return;
 
@@ -351,6 +383,14 @@ export default function DraftTournamentScreen() {
                   </Text>
                 </View>
                 <Text style={styles.participantName}>{participant.display_name}</Text>
+                {tournament.status === 'draft' && participant.user_id !== user?.id && (
+                  <TouchableOpacity
+                    onPress={() => handleKickParticipant(participant)}
+                    style={styles.kickButton}
+                  >
+                    <Text style={styles.kickButtonText}>×</Text>
+                  </TouchableOpacity>
+                )}
               </View>
             ))
           )}
@@ -578,6 +618,16 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#1a1a1a',
     fontWeight: '500',
+  },
+  kickButton: {
+    marginLeft: 'auto',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  kickButtonText: {
+    fontSize: 20,
+    color: '#ef4444',
+    fontWeight: '700',
   },
   warningCard: {
     backgroundColor: '#fef3c7',
