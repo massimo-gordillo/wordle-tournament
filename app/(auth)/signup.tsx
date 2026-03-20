@@ -60,6 +60,7 @@ export default function SignupScreen() {
             placeholderTextColor="#999"
             value={email}
             onChangeText={setEmail}
+            autoCorrect={false}
             autoCapitalize="none"
             keyboardType="email-address"
             editable={!loading}
@@ -70,6 +71,8 @@ export default function SignupScreen() {
             placeholder="Password (min 6 characters)"
             placeholderTextColor="#999"
             value={password}
+            autoCapitalize="none"
+            autoCorrect={false}
             onChangeText={setPassword}
             secureTextEntry
             editable={!loading}

@@ -46,6 +46,7 @@ export default function LoginScreen() {
             value={email}
             onChangeText={setEmail}
             autoCapitalize="none"
+            autoCorrect={false}
             keyboardType="email-address"
             editable={!loading}
           />
@@ -56,7 +57,9 @@ export default function LoginScreen() {
             placeholderTextColor="#999"
             value={password}
             onChangeText={setPassword}
-            secureTextEntry
+            autoCapitalize="none"
+            autoCorrect={false}
+            secureTextEntry={true}
             editable={!loading}
           />
 
@@ -122,6 +125,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#e0e0e0',
   },
+  
   button: {
     backgroundColor: '#10b981',
     borderRadius: 12,
