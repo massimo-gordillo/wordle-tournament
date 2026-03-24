@@ -130,6 +130,35 @@ export interface Database {
           last_updated?: string
         }
       }
+      tournament_chat: {
+        Row: {
+          id: string
+          tournament_id: string
+          user_id: string
+          message: string
+          message_type: 'chat' | 'result'
+          submission_date: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          tournament_id: string
+          user_id: string
+          message: string
+          message_type: 'chat' | 'result'
+          submission_date?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          tournament_id?: string
+          user_id?: string
+          message?: string
+          message_type?: 'chat' | 'result'
+          submission_date?: string | null
+          created_at?: string
+        }
+      }
     }
   }
 }

@@ -1,12 +1,29 @@
-import { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity, RefreshControl, Alert, Platform } from 'react-native';
+import { useState, useCallback } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  ActivityIndicator,
+  TouchableOpacity,
+  RefreshControl,
+  Alert,
+  Platform,
+  KeyboardAvoidingView,
+} from 'react-native';
 import { useLocalSearchParams, router, useFocusEffect } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
+import { useAppConfig } from '@/contexts/ConfigContext';
 import { supabase } from '@/lib/supabase';
 import { ChevronLeft, Trophy } from 'lucide-react-native';
 import { getTodayDateEST, getYesterdayDateEST, getDateInEST } from '@/lib/dateUtils';
 import { formatDateShort } from '@/utils/dateUtils';
 import { DailySubmissionCard } from '@/components/DailySubmissionCard';
+import {
+  TournamentChatSection,
+  type TournamentChatMessage,
+} from '@/components/TournamentChatSection';
+import { devLog } from '@/utils/logger';
 
 interface Tournament {
   id: string;
@@ -34,6 +51,7 @@ interface Submission {
 
 export default function TournamentDetailScreen() {
   const { user } = useAuth();
+  const { config } = useAppConfig();
   const { id } = useLocalSearchParams();
   const [tournament, setTournament] = useState<Tournament | null>(null);
   const [scores, setScores] = useState<Score[]>([]);
@@ -46,6 +64,8 @@ export default function TournamentDetailScreen() {
   const [resultsReady, setResultsReady] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [forfeitLoading, setForfeitLoading] = useState(false);
+  const [chatMessages, setChatMessages] = useState<TournamentChatMessage[]>([]);
+  const [chatSending, setChatSending] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -129,7 +149,8 @@ export default function TournamentDetailScreen() {
           : activeParticipantIds.every(uid => submittedUserIds.includes(uid));
 
       const estNow = getDateInEST();
-      const isPastCutoff = estNow.getHours() >= 23;
+      const cutoffHour = config?.cutoffHourEst ?? 23;
+      const isPastCutoff = estNow.getHours() >= cutoffHour;
 
       const ready = allActiveSubmitted || isPastCutoff;
       setResultsReady(ready);
@@ -209,6 +230,41 @@ export default function TournamentDetailScreen() {
         });
 
       setScores(formattedScores);
+    }
+
+    if (tournamentData && tournamentData.status !== 'draft') {
+      const { data: chatData, error: chatErr } = await supabase
+        .from('tournament_chat')
+        .select('id, user_id, message, message_type, submission_date, created_at, users(display_name)')
+        .eq('tournament_id', id)
+        .order('created_at', { ascending: true });
+
+      if (chatErr) {
+        devLog('tournament chat load failed', chatErr);
+        setChatMessages([]);
+      } else {
+        setChatMessages(
+          (chatData ?? []).map(row => {
+            const u = row.users as
+              | { display_name: string }
+              | { display_name: string }[]
+              | null
+              | undefined;
+            const profile = Array.isArray(u) ? u[0] : u;
+            return {
+              id: row.id,
+              user_id: row.user_id,
+              message: row.message,
+              message_type: row.message_type as 'chat' | 'result',
+              submission_date: row.submission_date,
+              created_at: row.created_at,
+              display_name: profile?.display_name ?? 'Unknown',
+            };
+          }),
+        );
+      }
+    } else {
+      setChatMessages([]);
     }
 
     setLoading(false);
@@ -308,8 +364,47 @@ export default function TournamentDetailScreen() {
     );
   };
 
+  const handleSendChat = async (text: string) => {
+    if (!user || !id) return;
+    setChatSending(true);
+    try {
+      const { error } = await supabase.from('tournament_chat').insert({
+        tournament_id: id as string,
+        user_id: user.id,
+        message: text,
+        message_type: 'chat',
+      });
+      if (error) {
+        devLog('send chat failed', error);
+        return;
+      }
+      await loadTournamentData();
+    } finally {
+      setChatSending(false);
+    }
+  };
+
+  const canPostChat =
+    !!tournament &&
+    (tournament.status === 'active' || tournament.status === 'closed') &&
+    participants.some(p => p.user_id === user?.id);
+
+  const cutoffHourEst = config?.cutoffHourEst ?? 23;
+  const cutoffLabel =
+    cutoffHourEst === 0
+      ? 'midnight'
+      : cutoffHourEst === 12
+        ? 'noon'
+        : cutoffHourEst > 12
+          ? `${cutoffHourEst - 12} PM`
+          : `${cutoffHourEst} AM`;
+
   return (
     <View style={styles.container}>
+      <KeyboardAvoidingView
+        style={styles.keyboardAvoid}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
       <View style={styles.header}>
         <TouchableOpacity onPress={handleBack} style={styles.backButton}>
           <ChevronLeft size={24} color="#fff" />
@@ -343,7 +438,9 @@ export default function TournamentDetailScreen() {
         {!resultsReady && tournament.status === 'active' && (
           <View style={styles.waitingCard}>
             <Text style={styles.waitingText}>Waiting for today's submissions...</Text>
-            <Text style={styles.waitingSubtext}>Results will be available after all active players submit or at 11 PM EST</Text>
+            <Text style={styles.waitingSubtext}>
+              Results will be available after all active players submit or at {cutoffLabel} EST
+            </Text>
           </View>
         )}
 
@@ -388,6 +485,16 @@ export default function TournamentDetailScreen() {
             ))
           )}
         </View>
+
+        <TournamentChatSection
+          messages={chatMessages}
+          currentUserId={user?.id}
+          todayEst={getTodayDateEST()}
+          resultsReadyForToday={resultsReady}
+          canCompose={canPostChat}
+          sending={chatSending}
+          onSend={handleSendChat}
+        />
 
         {participants.length > 0 && tournament.status === 'active' && (
           <View style={styles.section}>
@@ -525,6 +632,7 @@ export default function TournamentDetailScreen() {
             </View>
           )}
       </ScrollView>
+      </KeyboardAvoidingView>
     </View>
     
   );
@@ -534,6 +642,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f5f5f5',
+  },
+  keyboardAvoid: {
+    flex: 1,
   },
   loadingContainer: {
     flex: 1,

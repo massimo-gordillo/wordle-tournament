@@ -190,6 +190,58 @@ export default function DailySubmissionScreen() {
     return { guesses, score, normalizedGrid };
   };
 
+  const insertResultChatForTournaments = async (
+    userId: string,
+    submissionDate: string,
+    rawPastedText: string,
+  ) => {
+    let raw = rawPastedText;
+    if (raw.length > 400) {
+      raw = raw.slice(0, 400);
+      devLog('insertResultChatForTournaments: truncated message to 400 chars');
+    }
+
+    const { data: memberships, error: memErr } = await supabase
+      .from('tournament_participants')
+      .select('tournament_id')
+      .eq('user_id', userId);
+
+    if (memErr) {
+      devLog('insertResultChatForTournaments: participants query failed', memErr);
+      return;
+    }
+
+    const tournamentIds = [...new Set(memberships?.map(m => m.tournament_id) ?? [])];
+    if (tournamentIds.length === 0) return;
+
+    const { data: openTournaments, error: tourErr } = await supabase
+      .from('tournaments')
+      .select('id')
+      .in('id', tournamentIds)
+      .in('status', ['active', 'closed']);
+
+    if (tourErr) {
+      devLog('insertResultChatForTournaments: tournaments query failed', tourErr);
+      return;
+    }
+
+    const rows =
+      openTournaments?.map(t => ({
+        tournament_id: t.id,
+        user_id: userId,
+        message: raw,
+        message_type: 'result' as const,
+        submission_date: submissionDate,
+      })) ?? [];
+
+    if (rows.length === 0) return;
+
+    const { error: chatErr } = await supabase.from('tournament_chat').insert(rows);
+    if (chatErr) {
+      devLog('insertResultChatForTournaments: chat insert failed', chatErr);
+    }
+  };
+
   const handleSubmit = async () => {
     if (!submissionText.trim()) {
       setError('Please paste your result for today\'s Wordle');
@@ -219,6 +271,7 @@ export default function DailySubmissionScreen() {
     }
 
     const today = getTodayDateEST();
+    const rawPastedForChat = submissionText.trim();
 
     const { data, error: dbError } = await supabase
       .from('daily_submissions')
@@ -246,6 +299,7 @@ export default function DailySubmissionScreen() {
       }
     } else {
       devLog('handleSubmit: submission saved', { data });
+      await insertResultChatForTournaments(user!.id, today, rawPastedForChat);
       setTodaySubmission({
         submission_text: data.submission_text,
         wordle_score: data.wordle_score,
