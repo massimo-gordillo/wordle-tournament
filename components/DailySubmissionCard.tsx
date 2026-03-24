@@ -1,7 +1,10 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 
+type Variant = 'screen' | 'chat';
+
 type Props = {
+  variant?: Variant;
   dateLabel?: string;
   playerName?: string;
   didSubmit: boolean;
@@ -10,7 +13,8 @@ type Props = {
 };
 
 export function DailySubmissionCard({
-  dateLabel,
+  variant = 'screen',
+  dateLabel: _dateLabel,
   playerName,
   didSubmit,
   score,
@@ -25,7 +29,11 @@ export function DailySubmissionCard({
     return (
       <View style={styles.wordleGrid}>
         {gridLines.map((line, index) => (
-          <Text key={index} style={styles.wordleRow}>
+          <Text
+            key={index}
+            style={styles.wordleRow}
+            selectable={variant === 'chat'}
+          >
             {line
               .split('')
               .map(ch => (ch === 'G' ? '🟩' : ch === 'Y' ? '🟨' : '⬛'))
@@ -36,12 +44,11 @@ export function DailySubmissionCard({
     );
   };
 
+  const isChat = variant === 'chat';
+
   return (
-    <View style={styles.container}>
-      <View style={styles.card}>
-        {
-        //{dateLabel ? <Text style={styles.dateLabel}>{dateLabel}</Text> : null}
-        }
+    <View style={[styles.container, isChat ? styles.containerChat : styles.containerScreen]}>
+      <View style={[styles.card, isChat ? styles.cardChat : styles.cardScreen]}>
         <View style={styles.headerRow}>
           {playerName ? (
             <Text style={styles.nameText}>{playerName}</Text>
@@ -60,24 +67,35 @@ export function DailySubmissionCard({
 }
 
 const styles = StyleSheet.create({
-  container: {
+  container: {},
+  containerScreen: {
     paddingHorizontal: 64,
+  },
+  containerChat: {
+    paddingHorizontal: 0,
+    width: '100%',
+    maxWidth: '100%',
   },
   card: {
     backgroundColor: '#fff',
     borderRadius: 12,
     padding: 12,
     marginBottom: 12,
+  },
+  cardScreen: {
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
   },
-  dateLabel: {
-    fontSize: 12,
-    color: '#6b7280',
-    marginBottom: 4,
+  cardChat: {
+    marginBottom: 0,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 2,
+    elevation: 1,
   },
   headerRow: {
     flexDirection: 'row',
@@ -105,4 +123,3 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
 });
-

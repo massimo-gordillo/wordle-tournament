@@ -235,7 +235,9 @@ export default function TournamentDetailScreen() {
     if (tournamentData && tournamentData.status !== 'draft') {
       const { data: chatData, error: chatErr } = await supabase
         .from('tournament_chat')
-        .select('id, user_id, message, message_type, submission_date, created_at, users(display_name)')
+        .select(
+          'id, user_id, message, message_type, submission_date, created_at, daily_submission_id, users(display_name), daily_submissions!tournament_chat_daily_submission_id_fkey(submission_text, wordle_score)',
+        )
         .eq('tournament_id', id)
         .order('created_at', { ascending: true });
 
@@ -251,6 +253,12 @@ export default function TournamentDetailScreen() {
               | null
               | undefined;
             const profile = Array.isArray(u) ? u[0] : u;
+            const ds = row.daily_submissions as
+              | { submission_text: string; wordle_score: number }
+              | { submission_text: string; wordle_score: number }[]
+              | null
+              | undefined;
+            const sub = Array.isArray(ds) ? ds[0] : ds;
             return {
               id: row.id,
               user_id: row.user_id,
@@ -259,6 +267,9 @@ export default function TournamentDetailScreen() {
               submission_date: row.submission_date,
               created_at: row.created_at,
               display_name: profile?.display_name ?? 'Unknown',
+              daily_submission_id: row.daily_submission_id ?? null,
+              submission_text: sub?.submission_text ?? null,
+              wordle_score: sub?.wordle_score ?? null,
             };
           }),
         );

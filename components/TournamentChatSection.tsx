@@ -9,6 +9,10 @@ import {
   Platform,
 } from 'react-native';
 import { Lock, Send } from 'lucide-react-native';
+import { DailySubmissionCard } from '@/components/DailySubmissionCard';
+
+/** Must match placeholder written for `tournament_chat.message` when `message_type` is `result`. */
+const RESULT_MESSAGE_PLACEHOLDER = 'result';
 
 export interface TournamentChatMessage {
   id: string;
@@ -18,6 +22,9 @@ export interface TournamentChatMessage {
   submission_date: string | null;
   created_at: string;
   display_name: string;
+  daily_submission_id?: string | null;
+  submission_text?: string | null;
+  wordle_score?: number | null;
 }
 
 interface TournamentChatSectionProps {
@@ -69,30 +76,65 @@ export function TournamentChatSection({
         ) : (
           messages.map(msg => {
             if (msg.message_type === 'result') {
+              const isSelf = msg.user_id === currentUserId;
               const revealed = resultIsRevealed(
                 msg.submission_date,
                 todayEst,
                 resultsReadyForToday,
               );
+              const lockIconColor = isSelf ? '#d1fae5' : '#6b7280';
+
+              const hasSubmissionPayload =
+                !!msg.submission_text &&
+                msg.submission_text.length > 0 &&
+                typeof msg.wordle_score === 'number';
+
+              const hasLegacyRevealBody =
+                !!msg.message &&
+                msg.message !== RESULT_MESSAGE_PLACEHOLDER &&
+                !hasSubmissionPayload;
+
               return (
-                <View key={msg.id} style={styles.resultRow}>
-                  {revealed ? (
-                    <View style={styles.resultRevealedBox}>
-                      <Text style={styles.resultRevealedMeta}>
-                        {msg.display_name}&apos;s Wordle
-                      </Text>
-                      <Text style={styles.resultRevealedText} selectable>
+                <View
+                  key={msg.id}
+                  style={[styles.chatRow, isSelf ? styles.chatRowSelf : styles.chatRowOther]}
+                >
+                  <View style={[styles.bubble, isSelf ? styles.bubbleSelf : styles.bubbleOther]}>
+                    {!revealed ? (
+                      <View style={styles.resultLockedInner}>
+                        <Lock size={16} color={lockIconColor} />
+                        <Text
+                          style={[
+                            styles.resultLockedBubbleText,
+                            isSelf && styles.resultLockedBubbleTextSelf,
+                          ]}
+                        >
+                          {msg.display_name} has submitted their result
+                        </Text>
+                      </View>
+                    ) : hasSubmissionPayload ? (
+                      <DailySubmissionCard
+                        variant="chat"
+                        playerName={msg.display_name}
+                        didSubmit
+                        score={msg.wordle_score ?? undefined}
+                        submissionText={msg.submission_text ?? undefined}
+                      />
+                    ) : hasLegacyRevealBody ? (
+                      <Text
+                        style={[styles.resultLegacyText, isSelf && styles.bubbleTextSelf]}
+                        selectable
+                      >
                         {msg.message}
                       </Text>
-                    </View>
-                  ) : (
-                    <View style={styles.resultLockedBox}>
-                      <Lock size={16} color="#6b7280" style={styles.lockIcon} />
-                      <Text style={styles.resultLockedText}>
-                        {msg.display_name} has submitted their result
+                    ) : (
+                      <Text
+                        style={[styles.resultFallbackText, isSelf && styles.resultLockedBubbleTextSelf]}
+                      >
+                        Result unavailable
                       </Text>
-                    </View>
-                  )}
+                    )}
+                  </View>
                 </View>
               );
             }
@@ -205,54 +247,31 @@ const styles = StyleSheet.create({
   bubbleTextSelf: {
     color: '#fff',
   },
-  resultRow: {
-    width: '100%',
+  resultLockedInner: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    gap: 8,
+    flexShrink: 1,
   },
-  resultRevealedBox: {
-    width: '100%',
-    backgroundColor: '#f3f4f6',
-    borderRadius: 12,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
+  resultLockedBubbleText: {
+    fontSize: 14,
+    fontStyle: 'italic',
+    color: '#4b5563',
+    flexShrink: 1,
   },
-  resultRevealedMeta: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#6b7280',
-    marginBottom: 8,
-    textAlign: 'center',
+  resultLockedBubbleTextSelf: {
+    color: 'rgba(255,255,255,0.95)',
   },
-  resultRevealedText: {
+  resultLegacyText: {
     fontFamily: Platform.select({ ios: 'Menlo', android: 'monospace', default: 'monospace' }),
     fontSize: 13,
     lineHeight: 18,
     color: '#111827',
   },
-  resultLockedBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#f9fafb',
-    borderRadius: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-    gap: 8,
-    width: '100%',
-  },
-  lockIcon: {
-    marginRight: 0,
-  },
-  resultLockedText: {
+  resultFallbackText: {
     fontSize: 14,
     color: '#4b5563',
     fontStyle: 'italic',
-    flex: 1,
-    textAlign: 'center',
   },
   composer: {
     flexDirection: 'row',

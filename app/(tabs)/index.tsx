@@ -13,6 +13,9 @@ interface Submission {
   submitted_at: string;
 }
 
+/** Placeholder for tournament_chat.message when message_type is result (grid lives on daily_submissions). */
+const RESULT_CHAT_PLACEHOLDER_MESSAGE = 'result';
+
 export default function DailySubmissionScreen() {
   const { user } = useAuth();
   const { config } = useAppConfig();
@@ -193,14 +196,8 @@ export default function DailySubmissionScreen() {
   const insertResultChatForTournaments = async (
     userId: string,
     submissionDate: string,
-    rawPastedText: string,
+    dailySubmissionId: string,
   ) => {
-    let raw = rawPastedText;
-    if (raw.length > 400) {
-      raw = raw.slice(0, 400);
-      devLog('insertResultChatForTournaments: truncated message to 400 chars');
-    }
-
     const { data: memberships, error: memErr } = await supabase
       .from('tournament_participants')
       .select('tournament_id')
@@ -229,9 +226,10 @@ export default function DailySubmissionScreen() {
       openTournaments?.map(t => ({
         tournament_id: t.id,
         user_id: userId,
-        message: raw,
+        message: RESULT_CHAT_PLACEHOLDER_MESSAGE,
         message_type: 'result' as const,
         submission_date: submissionDate,
+        daily_submission_id: dailySubmissionId,
       })) ?? [];
 
     if (rows.length === 0) return;
@@ -271,7 +269,6 @@ export default function DailySubmissionScreen() {
     }
 
     const today = getTodayDateEST();
-    const rawPastedForChat = submissionText.trim();
 
     const { data, error: dbError } = await supabase
       .from('daily_submissions')
@@ -299,7 +296,7 @@ export default function DailySubmissionScreen() {
       }
     } else {
       devLog('handleSubmit: submission saved', { data });
-      await insertResultChatForTournaments(user!.id, today, rawPastedForChat);
+      await insertResultChatForTournaments(user!.id, today, data.id);
       setTodaySubmission({
         submission_text: data.submission_text,
         wordle_score: data.wordle_score,

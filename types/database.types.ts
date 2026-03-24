@@ -139,6 +139,7 @@ export interface Database {
           message_type: 'chat' | 'result'
           submission_date: string | null
           created_at: string
+          daily_submission_id: string | null
         }
         Insert: {
           id?: string
@@ -148,6 +149,7 @@ export interface Database {
           message_type: 'chat' | 'result'
           submission_date?: string | null
           created_at?: string
+          daily_submission_id?: string | null
         }
         Update: {
           id?: string
@@ -157,6 +159,7 @@ export interface Database {
           message_type?: 'chat' | 'result'
           submission_date?: string | null
           created_at?: string
+          daily_submission_id?: string | null
         }
       }
     }
