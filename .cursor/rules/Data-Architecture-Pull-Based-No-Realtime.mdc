@@ -27,7 +27,7 @@ This app is intentionally pull-based with no realtime subscriptions.
 ## Development
 - Any debug logging or dev-only UI should be gated behind __DEV__ checks. Create a utils/logger.ts with a devLog utility and use that instead of raw console.log throughout the app.
 - The app targets iOS and Android as its primary platforms. Web (via Expo Web) is supported for development and testing purposes only. Prioritize React Native layout and UX patterns. Do not add web-specific features or optimize for web-only behavior.
-- When needing to make db migrations, do not modify existing migration files, instead create a new migration file. 
+- When needing to make db migrations, do not modify existing migration files, instead create a new migration file. Never edit a migration file after initial creation. If changes are needed, create a new migration file instead."
 
 ## Code Style: Early Returns and Flat Functions
 
@@ -40,3 +40,17 @@ conditionals.
 - Avoid nested if/else blocks in async functions — flatten them with returns
 - By the time the happy path code runs, all preconditions should be guaranteed 
   without further checks
+
+# Database: PL/pgSQL Function Syntax
+
+When writing PL/pgSQL functions in migrations, follow these rules:
+
+## Rules
+- Never use CTEs (`WITH` blocks) combined with `PERFORM` — this is invalid 
+  PL/pgSQL syntax
+- Never nest `DECLARE/BEGIN` blocks inside a function body — there is one 
+  `DECLARE` block at the top of the function only
+- Use `FOR ... LOOP` for iterating over query results, not CTEs with PERFORM
+- Use `PERFORM` only for calling functions where the return value is discarded
+- Test all PL/pgSQL syntax mentally against PL/pgSQL rules, not plain SQL rules 
+  — they are different languages with different constraints
