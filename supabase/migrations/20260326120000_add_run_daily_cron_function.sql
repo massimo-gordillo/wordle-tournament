@@ -1,27 +1,26 @@
-# Wordle Tournament Daily Cron Job
+/*
+  # Add run_daily_cron() helper
 
-## Overview
-This cron job should run daily at 11:00 PM EST to handle:
-1. Apply -2 point penalties for users who haven't submitted
-2. Update all tournament scores (triggers automatic leaderboard update)
-3. Close tournaments that have ended
+  This wraps the daily cron SQL from CRON_JOB_LOGIC.md into a reusable function
+  that can be:
+  - Invoked manually in local/dev via: SELECT run_daily_cron();
+  - Invoked by a scheduler in production (GitHub Actions, EasyCron, pg_cron, etc.)
 
-Note: Leaderboard updates also happen automatically when all players submit their daily results.
+  Behavior:
+  1. Apply -2 point penalties for users who haven't submitted today.
+  2. Recalculate all tournament scores (including penalties).
+  3. Auto-forfeit users with N consecutive penalty days.
+  4. Close tournaments whose end_date is today or earlier.
+*/
 
-## Schedule
-Run daily at 11:00 PM EST (3:00 AM UTC next day during standard time, 2:00 AM UTC during daylight time)
-
-## SQL Logic
-
-```sql
--- ============================================================================
--- DAILY CRON JOB - Run at 11:00 PM EST
--- ============================================================================
-
-DO $$
+CREATE OR REPLACE FUNCTION run_daily_cron()
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
 DECLARE
   today_date date;
-  affected_users record;
   v_auto_n integer;
   first_streak_day date;
 BEGIN
@@ -71,15 +70,14 @@ BEGIN
     AND NOT EXISTS (
       SELECT 1 FROM daily_submissions ds
       WHERE ds.user_id = tp.user_id
-      AND ds.submission_date = today_date
+        AND ds.submission_date = today_date
     )
   ON CONFLICT (user_id, submission_date) DO NOTHING;
 
   -- ============================================================================
-  -- STEP 2: Recalculate all tournament scores for active tournaments
+  -- STEP 2: Recalculate all tournament scores for active/closed tournaments
   -- ============================================================================
 
-  -- Update tournament scores for all participants in active tournaments
   INSERT INTO tournament_scores (tournament_id, user_id, total_score, last_updated)
   SELECT
     tp.tournament_id,
@@ -104,11 +102,6 @@ BEGIN
   -- STEP 2b: Auto-forfeit users with N consecutive penalty days
   -- ============================================================================
 
-  -- For each active tournament + participant:
-  -- - Tournament must have started on or after the first day of the streak window
-  -- - Participant must have a penalty submission for each day in [first_streak_day, today_date]
-  --   (we only check within that N-day window)
-  -- - Call the shared forfeit_tournament_internal helper so behavior stays consistent
   WITH eligible_forfeit AS (
     SELECT
       tp.tournament_id,
@@ -139,92 +132,10 @@ BEGIN
   UPDATE tournaments
   SET status = 'closed'
   WHERE status = 'active'
-  AND end_date <= today_date;
+    AND end_date <= today_date;
 
-END $$;
-```
+END;
+$$;
 
-## Implementation Options
+GRANT EXECUTE ON FUNCTION run_daily_cron() TO authenticated;
 
-### Option 1: GitHub Actions (Recommended for Expo projects)
-Create `.github/workflows/daily-cron.yml`:
-
-```yaml
-name: Daily Wordle Cron Job
-on:
-  schedule:
-    - cron: '0 3 * * *'  # 3 AM UTC = 11 PM EST (adjust for DST)
-  workflow_dispatch:  # Allow manual triggers
-
-jobs:
-  run-cron:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: Run SQL Cron Job
-        env:
-          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
-        run: |
-          psql $SUPABASE_DB_URL -f ./cron-job.sql
-```
-
-### Option 2: Supabase Edge Function + External Scheduler
-Create an Edge Function that runs the SQL and call it from:
-- EasyCron (https://www.easycron.com)
-- Cron-job.org (https://cron-job.org)
-- Any cloud scheduler (AWS EventBridge, Google Cloud Scheduler, etc.)
-
-### Option 3: pg_cron Extension (If available on your Supabase plan)
-```sql
-SELECT cron.schedule(
-  'wordle-daily-cron',
-  '0 23 * * *',  -- 11 PM daily
-  $$
-  -- Insert the SQL logic here
-  $$
-);
-```
-
-## Testing
-
-To test the cron job logic manually:
-
-```sql
--- Test with a specific date
-DO $$
-DECLARE
-  test_date date := '2024-01-15';
-BEGIN
-  -- Run the cron logic with test_date instead of today_date
-  -- (Copy the cron job SQL and replace today_date with test_date)
-END $$;
-```
-
-## Monitoring
-
-Add logging to track cron job execution:
-
-```sql
-CREATE TABLE IF NOT EXISTS cron_job_logs (
-  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
-  job_name text NOT NULL,
-  run_date date NOT NULL,
-  penalties_applied integer,
-  scores_updated integer,
-  tournaments_closed integer,
-  executed_at timestamptz DEFAULT now()
-);
-```
-
-Then modify the cron job to insert logs:
-
-```sql
-INSERT INTO cron_job_logs (job_name, run_date, penalties_applied, scores_updated, tournaments_closed)
-VALUES (
-  'daily-wordle-cron',
-  today_date,
-  (SELECT COUNT(*) FROM daily_submissions WHERE submission_date = today_date AND submission_text = 'NO SUBMISSION - PENALTY'),
-  (SELECT COUNT(*) FROM tournament_scores WHERE last_updated::date = today_date),
-  (SELECT COUNT(*) FROM tournaments WHERE status = 'closed' AND end_date = today_date - 1)
-);
-```
