@@ -29,6 +29,8 @@ import {
 } from '@/components/TournamentChatSection';
 import { devLog } from '@/utils/logger';
 
+const NO_SUBMISSION_PENALTY_LABEL = 'NO SUBMISSION - PENALTY';
+
 interface Tournament {
   id: string;
   name: string;
@@ -142,6 +144,7 @@ export default function TournamentDetailScreen() {
         s => s.submission_date === today,
       );
 
+      // "Submitted" for readiness purposes includes penalty rows inserted at cutoff.
       const submittedUserIds = todaySubmissionsData.map(s => s.user_id);
       // Exclude forfeited players: results unlock when all active participants have submitted (or at 11 PM EST)
       const activeParticipantIds = allParticipants
@@ -326,7 +329,9 @@ export default function TournamentDetailScreen() {
     if (participant?.forfeited) {
       return 'Forfeited';
     }
-    if (todaySubmittedIds.has(userId)) {
+    const todayRow = todaySubmissions.find(s => s.user_id === userId);
+    const isPenaltyRow = todayRow?.submission_text === NO_SUBMISSION_PENALTY_LABEL;
+    if (todaySubmittedIds.has(userId) && !isPenaltyRow) {
       return 'Submitted';
     }
     if (resultsReady) {
@@ -593,9 +598,18 @@ export default function TournamentDetailScreen() {
                           p.forfeited &&
                           p.forfeited_at_date != null &&
                           date >= p.forfeited_at_date;
-                        const didSubmit = !!sub && !isForfeitPenaltyDay;
-                        const score = isForfeitPenaltyDay ? -2 : sub?.wordle_score;
-                        const submissionText = isForfeitPenaltyDay
+                        const isPenaltyRow =
+                          sub?.submission_text === NO_SUBMISSION_PENALTY_LABEL;
+                        const didSubmit =
+                          !!sub && !isForfeitPenaltyDay && !isPenaltyRow;
+                        const score = isForfeitPenaltyDay
+                          ? -2
+                          : isPenaltyRow
+                          ? -2
+                          : typeof sub?.wordle_score === 'number'
+                          ? sub.wordle_score
+                          : -2;
+                        const submissionText = isForfeitPenaltyDay || isPenaltyRow
                           ? undefined
                           : sub?.submission_text;
 

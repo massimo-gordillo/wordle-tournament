@@ -33,8 +33,8 @@ export function TournamentListItem({
       <Text style={styles.dateText}>{`Duration: ${durationLabel} ${durationLabel === "1" ? 'day' : 'days'}`}</Text>
 
      {endDateLabel ? (
-        <Text style={styles.dateText}>{`Ends: ${endDateLabel}`}</Text>
-      ) : null}
+        <Text style={styles.dateText}>{`${statusLabel === 'Closed' ? 'Ended on:' : 'Ends:'} ${endDateLabel}`}</Text>
+        ) : null}
       {secondaryText ? <Text style={styles.secondaryText}>{secondaryText}</Text> : null}
     </TouchableOpacity>
   );

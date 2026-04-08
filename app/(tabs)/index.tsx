@@ -13,6 +13,8 @@ interface Submission {
   submitted_at: string;
 }
 
+const NO_SUBMISSION_PENALTY_LABEL = 'NO SUBMISSION - PENALTY';
+
 /** Placeholder for tournament_chat.message when message_type is result (grid lives on daily_submissions). */
 const RESULT_CHAT_PLACEHOLDER_MESSAGE = 'result';
 
@@ -66,6 +68,12 @@ export default function DailySubmissionScreen() {
       .maybeSingle();
 
     if (!error && data) {
+      // If the cron inserted a "no submission" penalty row at cutoff, don't render it
+      // as a Wordle grid submission.
+      if (data.submission_text === NO_SUBMISSION_PENALTY_LABEL) {
+        setTodaySubmission(null);
+        return;
+      }
       setTodaySubmission(data);
     }
   };
