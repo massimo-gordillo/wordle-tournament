@@ -244,7 +244,7 @@ export default function OngoingTournamentsScreen() {
                     const calendarDays =
                       Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
                     const durationLabel = calendarDays.toString();
-                    const endDateLabel = formatDateShort(end);
+                    const endDateLabel = formatDateShort(tournament.end_date);
 
                     return (
                       <TournamentListItem
@@ -288,7 +288,7 @@ export default function OngoingTournamentsScreen() {
                     const calendarDays =
                       Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
                     const durationLabel = calendarDays.toString();
-                    const endDateLabel = formatDateShort(end);
+                    const endDateLabel = formatDateShort(tournament.end_date);
 
                     return (
                       <TournamentListItem
