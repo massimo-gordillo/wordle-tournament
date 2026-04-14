@@ -39,7 +39,7 @@ const DURATION_OPTIONS: DurationOption[] = [
 export default function ManageTournamentsScreen() {
   const { user } = useAuth();
   const { config } = useAppConfig();
-  const { reset } = useLocalSearchParams<{ reset?: string }>();
+  const { reset, view } = useLocalSearchParams<{ reset?: string; view?: string }>();
   const [activeView, setActiveView] = useState<'menu' | 'drafts' | 'past'>('menu');
   const [draftTournaments, setDraftTournaments] = useState<Tournament[]>([]);
   const [pastTournaments, setPastTournaments] = useState<PastTournamentItem[]>([]);
@@ -66,6 +66,18 @@ export default function ManageTournamentsScreen() {
     setCreateModalVisible(false);
     setShowDurationPicker(false);
   }, [reset]);
+
+  useEffect(() => {
+    if (view === 'drafts') {
+      setActiveView('drafts');
+      void loadDraftTournaments();
+      return;
+    }
+    if (view === 'past') {
+      setActiveView('past');
+      void loadPastTournaments();
+    }
+  }, [view]);
 
   const loadUserDisplayName = async () => {
     if (!user) return;
@@ -241,7 +253,10 @@ export default function ManageTournamentsScreen() {
     setSaving(false);
     setCreateModalVisible(false);
     setDuration(DURATION_OPTIONS[0]);
-    router.push(`/draft-tournament/${tournamentId}`);
+    router.push({
+      pathname: '/draft-tournament/[id]',
+      params: { id: tournamentId, source: 'manage-menu' },
+    });
   };
 
   const renderMenu = () => (
@@ -327,7 +342,12 @@ export default function ManageTournamentsScreen() {
               statusColor="#f59e0b"
               durationLabel={calendarDays.toString()}
               secondaryText={`Join Code: ${tournament.join_code}`}
-              onPress={() => router.push(`/draft-tournament/${tournament.id}`)}
+              onPress={() =>
+                router.push({
+                  pathname: '/draft-tournament/[id]',
+                  params: { id: tournament.id, source: 'manage-drafts' },
+                })
+              }
             />
           );
         })

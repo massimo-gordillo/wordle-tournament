@@ -45,7 +45,7 @@ interface Participant {
 }
 
 export default function DraftTournamentScreen() {
-  const { id } = useLocalSearchParams();
+  const { id, source } = useLocalSearchParams<{ id: string; source?: string }>();
   const { user } = useAuth();
   const { config } = useAppConfig();
   const [tournament, setTournament] = useState<Tournament | null>(null);
@@ -280,8 +280,16 @@ export default function DraftTournamentScreen() {
   const isCreator = user?.id != null && tournament.created_by === user.id;
 
   const handleBack = () => {
-    if (router.canGoBack && router.canGoBack()) {
-      router.back();
+    if (source === 'manage-drafts') {
+      router.replace({
+        pathname: '/(tabs)/manage',
+        params: { view: 'drafts' },
+      });
+      return;
+    }
+
+    if (source === 'manage' || source === 'manage-menu') {
+      router.replace('/(tabs)/manage');
       return;
     }
 

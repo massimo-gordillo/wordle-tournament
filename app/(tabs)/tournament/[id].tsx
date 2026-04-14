@@ -110,7 +110,10 @@ export default function TournamentDetailScreen() {
 
     if (tournamentData) {
       if (tournamentData.status === 'draft') {
-        router.replace(`/draft-tournament/${id}`);
+        router.replace({
+          pathname: '/draft-tournament/[id]',
+          params: { id: id as string, source: source ?? 'tournaments' },
+        });
         return;
       }
       setTournament(tournamentData);
@@ -408,13 +411,13 @@ export default function TournamentDetailScreen() {
   const startedToday = getTodayDateEST() === tournament.start_date;
 
   const handleBack = () => {
-    if (router.canGoBack && router.canGoBack()) {
-      router.back();
+    if (source === 'manage') {
+      router.replace('/(tabs)/manage');
       return;
     }
 
-    if (source === 'manage') {
-      router.replace('/(tabs)/manage');
+    if (source === 'tournaments') {
+      router.replace('/(tabs)/tournaments');
       return;
     }
 
