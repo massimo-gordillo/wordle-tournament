@@ -1,0 +1,30 @@
+---
+description: Enforce safe Supabase/Postgres access—no raw SQL from app or string-built queries
+alwaysApply: true
+---
+
+# Supabase data access and SQL injection posture
+
+## App and shared TypeScript (`app/`, `lib/`, `components/`, `contexts/`, `hooks/`)
+
+- Use **only** `@supabase/supabase-js` with `createClient`, `.from()`, `.insert()`, `.update()`, `.select()`, `.rpc()`, and `auth.*` methods. Arguments must be **plain objects or JSON-serializable values** passed to the client—never concatenated into a SQL string.
+- **Do not** add: `pg` / `postgres` drivers, `sql` template tags with user input, `execute("SELECT ...")`, or any hand-built SQL in application code.
+- **Authorization** stays in Postgres (**RLS**, RPC definitions). The client does not “sanitize for SQL”; the API binds parameters.
+
+## Edge Functions (`supabase/functions/`)
+
+- Call Supabase via **HTTP** (`fetch` to `/rest/v1/...` or `/auth/v1/...`) with **`JSON.stringify` bodies** and fixed paths. Do not embed request-body fields into URL query strings in ways that change SQL (query params for filters are OK when PostgREST expects them; prefer RPC bodies for complex inputs).
+
+## Scripts (`scripts/*.mjs`)
+
+- Use **REST Admin API** and PostgREST with JSON bodies and **service role** from env. Same rule: no string-concatenated SQL.
+
+## SQL in `supabase/migrations/` and `supabase/*.sql`
+
+- **Allowed** here: DDL, PL/pgSQL functions, triggers. Review any **`EXECUTE` of dynamic SQL**—must use **`format(... %L)`** / parameters, never untrusted string concatenation into SQL text.
+- `CREATE TRIGGER ... EXECUTE FUNCTION name()` is **PostgreSQL trigger syntax** (names a function), not “execute arbitrary SQL,” and is safe.
+
+## When adding new patterns
+
+- Prefer **RPC with typed arguments** over ad-hoc dynamic SQL in the database.
+- If you must use dynamic SQL in PL/pgSQL, use **`EXECUTE ... USING`** with bound parameters or `format()` with **`%I` / `%L`** for identifiers and literals.

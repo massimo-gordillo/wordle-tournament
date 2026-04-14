@@ -23,6 +23,7 @@ export default function LoginScreen() {
     const { error } = await signIn(email, password);
 
     if (error) {
+      setPassword('');
       setError(error.message);
       setLoading(false);
       return;
@@ -135,6 +136,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
     fontSize: 16,
+    color: '#1a1a1a',
     borderWidth: 1,
     borderColor: '#e0e0e0',
   },

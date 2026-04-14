@@ -15,13 +15,14 @@ import { supabase } from '@/lib/supabase';
 
 export default function SignupScreen() {
   const [email, setEmail] = useState('');
+  const [displayName, setDisplayName] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   const handleSignup = async () => {
-    if (!email || !password || !confirmPassword) {
+    if (!email || !displayName.trim() || !password || !confirmPassword) {
       setError('Please fill in all fields');
       return;
     }
@@ -39,7 +40,7 @@ export default function SignupScreen() {
     setLoading(true);
     setError('');
 
-    const displayName = email.split('@')[0] || 'Player';
+    const trimmedDisplayName = displayName.trim();
     const emailRedirectTo = Linking.createURL('(tabs)');
 
     const { data, error: signUpError } = await supabase.auth.signUp({
@@ -47,11 +48,13 @@ export default function SignupScreen() {
       password,
       options: {
         emailRedirectTo,
-        data: { display_name: displayName },
+        data: { display_name: trimmedDisplayName },
       },
     });
 
     if (signUpError) {
+      setPassword('');
+      setConfirmPassword('');
       setError(signUpError.message);
       setLoading(false);
       return;
@@ -98,6 +101,18 @@ export default function SignupScreen() {
             autoCorrect={false}
             autoCapitalize="none"
             keyboardType="email-address"
+            editable={!loading}
+          />
+
+          <TextInput
+            style={styles.input}
+            placeholder="Display name"
+            placeholderTextColor="#999"
+            value={displayName}
+            onChangeText={setDisplayName}
+            autoCorrect={false}
+            autoCapitalize="words"
+            maxLength={50}
             editable={!loading}
           />
 
@@ -181,6 +196,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
     fontSize: 16,
+    color: '#1a1a1a',
     borderWidth: 1,
     borderColor: '#e0e0e0',
   },
