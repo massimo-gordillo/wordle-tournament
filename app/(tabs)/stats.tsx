@@ -42,48 +42,26 @@ export default function StatisticsScreen() {
     const bestScore = scores.length > 0 ? Math.max(...scores) : 0;
     const worstScore = scores.length > 0 ? Math.min(...scores.filter(s => s > 0)) : 0;
 
-    const { data: tournamentScores } = await supabase
-      .from('tournament_scores')
-      .select(`
-        tournament_id,
-        total_score,
-        tournaments!inner(status)
-      `)
+    const { data: wonTournaments } = await supabase
+      .from('tournament_winners')
+      .select('tournament_id')
       .eq('user_id', user.id);
-
-    const closedTournaments = tournamentScores?.filter(
-      (ts: any) => ts.tournaments.status === 'closed'
-    ) || [];
-
-    let wins = 0;
-    for (const tournament of closedTournaments) {
-      const { data: allScores } = await supabase
-        .from('tournament_scores')
-        .select('total_score')
-        .eq('tournament_id', tournament.tournament_id)
-        .order('total_score', { ascending: false });
-
-      if (!allScores || allScores.length === 0) {
-        continue;
-      }
-      if (allScores[0].total_score !== tournament.total_score) {
-        continue;
-      }
-      wins++;
-    }
 
     const { data: participations } = await supabase
       .from('tournament_participants')
-      .select('tournament_id')
+      .select(`
+        tournament_id,
+        tournaments!inner(status)
+      `)
       .eq('user_id', user.id)
-      .neq('tournament_id', 'draft')
-      .neq('tournament_id', 'cancelled');
+      .neq('tournaments.status', 'draft')
+      .neq('tournaments.status', 'cancelled');
 
 
     setStats({
       averageScore: Math.round(averageScore * 10) / 10,
       totalSubmissions,
-      tournamentWins: wins,
+      tournamentWins: wonTournaments?.length || 0,
       tournamentsParticipated: participations?.length || 0,
       bestScore,
       worstScore,

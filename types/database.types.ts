@@ -34,6 +34,7 @@ export interface Database {
           start_date: string
           end_date: string
           status: 'draft' | 'active' | 'closed' | 'cancelled'
+          winner_user_id: string | null
           created_by: string
           created_at: string
         }
@@ -44,6 +45,7 @@ export interface Database {
           start_date: string
           end_date: string
           status?: 'draft' | 'active' | 'closed' | 'cancelled'
+          winner_user_id?: string | null
           created_by: string
           created_at?: string
         }
@@ -54,6 +56,7 @@ export interface Database {
           start_date?: string
           end_date?: string
           status?: 'draft' | 'active' | 'closed' | 'cancelled'
+          winner_user_id?: string | null
           created_by?: string
           created_at?: string
         }
@@ -128,6 +131,23 @@ export interface Database {
           user_id?: string
           total_score?: number
           last_updated?: string
+        }
+      }
+      tournament_winners: {
+        Row: {
+          tournament_id: string
+          user_id: string
+          created_at: string
+        }
+        Insert: {
+          tournament_id: string
+          user_id: string
+          created_at?: string
+        }
+        Update: {
+          tournament_id?: string
+          user_id?: string
+          created_at?: string
         }
       }
       tournament_chat: {

@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,8 @@ import {
   Alert,
   Platform,
   KeyboardAvoidingView,
+  Animated,
+  Easing,
 } from 'react-native';
 import { useLocalSearchParams, router, useFocusEffect } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
@@ -55,6 +57,9 @@ interface Submission {
   submission_date: string;
 }
 
+const FANFARE_CONFETTI = ['🎉', '✨', '⭐', '🎊', '🏆', '💚', '🟨', '🟩'];
+const FANFARE_PIECES = 16;
+
 export default function TournamentDetailScreen() {
   const { user } = useAuth();
   const { config } = useAppConfig();
@@ -72,11 +77,25 @@ export default function TournamentDetailScreen() {
   const [forfeitLoading, setForfeitLoading] = useState(false);
   const [chatMessages, setChatMessages] = useState<TournamentChatMessage[]>([]);
   const [chatSending, setChatSending] = useState(false);
+  const [winnerUserIds, setWinnerUserIds] = useState<Set<string>>(new Set());
+  const [showFanfare, setShowFanfare] = useState(false);
+  const confettiValues = useRef(
+    Array.from({ length: FANFARE_PIECES }, () => new Animated.Value(0)),
+  ).current;
+  const fanfareScale = useRef(new Animated.Value(0.8)).current;
+  const fanfareOpacity = useRef(new Animated.Value(0)).current;
+  const celebratedTournamentIdRef = useRef<string | null>(null);
+  const confettiDropDistance = Platform.OS === 'web' ? 320 : 420;
 
   useFocusEffect(
     useCallback(() => {
+      celebratedTournamentIdRef.current = null;
+      setShowFanfare(false);
+      fanfareOpacity.setValue(0);
+      fanfareScale.setValue(0.8);
+      confettiValues.forEach(v => v.setValue(0));
       loadTournamentData();
-    }, [id])
+    }, [confettiValues, fanfareOpacity, fanfareScale, id])
   );
 
 
@@ -95,6 +114,17 @@ export default function TournamentDetailScreen() {
         return;
       }
       setTournament(tournamentData);
+
+      if (tournamentData.status === 'closed') {
+        const { data: winnersData } = await supabase
+          .from('tournament_winners')
+          .select('user_id')
+          .eq('tournament_id', id);
+
+        setWinnerUserIds(new Set((winnersData ?? []).map(w => w.user_id)));
+      } else {
+        setWinnerUserIds(new Set());
+      }
     }
 
     const { data: allParticipants } = await supabase
@@ -179,9 +209,12 @@ export default function TournamentDetailScreen() {
             s.submission_date <= cutoffDate,
         )
         .forEach(s => {
+          const isPenaltySubmission =
+            s.submission_text === NO_SUBMISSION_PENALTY_LABEL;
+          const effectiveScore = isPenaltySubmission ? -2 : s.wordle_score;
           submissionScoreByUserAndDay.set(
             `${s.user_id}:${s.submission_date}`,
-            s.wordle_score,
+            effectiveScore,
           );
         });
 
@@ -287,6 +320,71 @@ export default function TournamentDetailScreen() {
 
     setLoading(false);
   };
+
+  useEffect(() => {
+    const isWinner =
+      !!user?.id &&
+      !!tournament?.id &&
+      tournament.status === 'closed' &&
+      winnerUserIds.has(user.id);
+
+    if (!isWinner) return;
+    if (celebratedTournamentIdRef.current === tournament.id) return;
+
+    celebratedTournamentIdRef.current = tournament.id;
+    setShowFanfare(true);
+
+    fanfareScale.setValue(0.8);
+    fanfareOpacity.setValue(0);
+    confettiValues.forEach(v => v.setValue(0));
+
+    const confettiDurationBase = Platform.OS === 'web' ? 1150 : 1400;
+    const confettiAnimations = confettiValues.map((value, index) =>
+      Animated.timing(value, {
+        toValue: 1,
+        duration: confettiDurationBase + (index % 4) * 150,
+        delay: (index % 6) * 60,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: true,
+      }),
+    );
+
+    Animated.parallel([
+      Animated.sequence([
+        Animated.parallel([
+          Animated.timing(fanfareScale, {
+            toValue: 1.06,
+            duration: 220,
+            easing: Easing.out(Easing.back(1.3)),
+            useNativeDriver: true,
+          }),
+          Animated.timing(fanfareOpacity, {
+            toValue: 1,
+            duration: 200,
+            useNativeDriver: true,
+          }),
+        ]),
+        Animated.timing(fanfareScale, {
+          toValue: 1,
+          duration: 170,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: true,
+        }),
+      ]),
+      Animated.stagger(45, confettiAnimations),
+    ]).start();
+
+    const timeout = setTimeout(() => {
+      Animated.timing(fanfareOpacity, {
+        toValue: 0,
+        duration: 400,
+        easing: Easing.in(Easing.quad),
+        useNativeDriver: true,
+      }).start(() => setShowFanfare(false));
+    }, 2200);
+
+    return () => clearTimeout(timeout);
+  }, [confettiValues, fanfareOpacity, fanfareScale, tournament, user?.id, winnerUserIds]);
 
   if (loading) {
     return (
@@ -425,6 +523,58 @@ export default function TournamentDetailScreen() {
         style={styles.keyboardAvoid}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
+      {showFanfare && (
+        <View pointerEvents="none" style={styles.fanfareOverlay}>
+          {confettiValues.map((value, index) => (
+            <Animated.Text
+              key={`fanfare-${index}`}
+              style={[
+                styles.confettiPiece,
+                {
+                  left: `${(index % 8) * 12 + 4}%`,
+                  opacity: value.interpolate({
+                    inputRange: [0, 0.75, 1],
+                    outputRange: [1, 1, 0],
+                  }),
+                  transform: [
+                    {
+                      translateY: value.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [-40, confettiDropDistance],
+                      }),
+                    },
+                    {
+                      translateX: value.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [0, index % 2 === 0 ? -28 : 28],
+                      }),
+                    },
+                    {
+                      rotate: value.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: ['0deg', index % 2 === 0 ? '-190deg' : '190deg'],
+                      }),
+                    },
+                  ],
+                },
+              ]}
+            >
+              {FANFARE_CONFETTI[index % FANFARE_CONFETTI.length]}
+            </Animated.Text>
+          ))}
+          <Animated.View
+            style={[
+              styles.fanfareBadge,
+              {
+                opacity: fanfareOpacity,
+                transform: [{ scale: fanfareScale }],
+              },
+            ]}
+          >
+            <Text style={styles.fanfareText}>Champion! 🏆</Text>
+          </Animated.View>
+        </View>
+      )}
       <View style={styles.header}>
         <TouchableOpacity onPress={handleBack} style={styles.backButton}>
           <ChevronLeft size={24} color="#fff" />
@@ -489,7 +639,11 @@ export default function TournamentDetailScreen() {
             scores.map((score, index) => (
               <View key={score.user_id} style={styles.scoreCard}>
                 <View style={styles.scoreRank}>
-                  <Text style={styles.rankNumber}>#{index + 1}</Text>
+                  {isCompleted && winnerUserIds.has(score.user_id) ? (
+                    <Text style={styles.rankNumber}>🏆</Text>
+                  ) : (
+                    <Text style={styles.rankNumber}>#{index + 1}</Text>
+                  )}
                 </View>
                 <View style={styles.scoreInfo}>
                   <Text style={styles.scoreName}>
@@ -675,6 +829,30 @@ const styles = StyleSheet.create({
   },
   keyboardAvoid: {
     flex: 1,
+  },
+  fanfareOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 20,
+    alignItems: 'center',
+  },
+  confettiPiece: {
+    position: 'absolute',
+    top: 0,
+    fontSize: 20,
+  },
+  fanfareBadge: {
+    marginTop: 90,
+    backgroundColor: '#fef3c7',
+    borderColor: '#f59e0b',
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 18,
+    paddingVertical: 8,
+  },
+  fanfareText: {
+    color: '#92400e',
+    fontSize: 15,
+    fontWeight: '700',
   },
   loadingContainer: {
     flex: 1,

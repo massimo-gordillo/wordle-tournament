@@ -42,7 +42,7 @@ export default function DailySubmissionScreen() {
 
     if (pastCutoff) {
       setIsPastCutoff(true);
-      setTimeUntilCutoff('Submission window closed');
+      setTimeUntilCutoff('Submission window closed, opens tomorrow at 12:01AM EST');
       return;
     }
 
@@ -368,7 +368,7 @@ export default function DailySubmissionScreen() {
       <View style={styles.formCard}>
         <TextInput
           style={styles.textArea}
-          placeholder="Paste your Wordle result here..."
+          placeholder={isPastCutoff ? "Submission window closed" : "Paste your Wordle result here..."}
           placeholderTextColor="#999"
           value={submissionText}
           onChangeText={setSubmissionText}
