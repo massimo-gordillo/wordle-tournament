@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, RefreshControl, useWindowDimensions } from 'react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { Trophy, Target, TrendingUp } from 'lucide-react-native';
 import { useAppConfig } from '@/contexts/ConfigContext';
+import { formatDateLong } from '@/lib/dateUtils';  
 
 interface Stats {
   averageScore: number;
@@ -11,15 +12,25 @@ interface Stats {
   tournamentWins: number;
   tournamentsParticipated: number;
   bestScore: number;
+  bestScoreDate: string | null;
   worstScore: number;
 }
 
 export default function StatisticsScreen() {
   const { user } = useAuth();
   const { config } = useAppConfig();
+  const { width } = useWindowDimensions();
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const isWideLayout = width >= 768;
+  const isUltraNarrowLayout = width < 300;
+  const statCardLayoutStyle = isWideLayout
+    ? styles.statCardWide
+    : isUltraNarrowLayout
+      ? styles.statCardUltraNarrow
+      : styles.statCardNarrow;
+
 
   useEffect(() => {
     loadStatistics();
@@ -30,7 +41,7 @@ export default function StatisticsScreen() {
 
     const { data: submissions } = await supabase
       .from('daily_submissions')
-      .select('wordle_score')
+      .select('wordle_score, submission_date')
       .eq('user_id', user.id)
       .neq('submission_text', 'NO SUBMISSION - PENALTY');
 
@@ -40,6 +51,10 @@ export default function StatisticsScreen() {
       ? scores.reduce((a, b) => a + b, 0) / scores.length
       : 0;
     const bestScore = scores.length > 0 ? Math.max(...scores) : 0;
+    const bestScoreDate = submissions
+      ?.filter(s => s.wordle_score === bestScore)
+      .sort((a, b) => b.submission_date.localeCompare(a.submission_date))[0]
+      ?.submission_date ?? null;
     const worstScore = scores.length > 0 ? Math.min(...scores.filter(s => s > 0)) : 0;
 
     const { data: wonTournaments } = await supabase
@@ -64,6 +79,7 @@ export default function StatisticsScreen() {
       tournamentWins: wonTournaments?.length || 0,
       tournamentsParticipated: participations?.length || 0,
       bestScore,
+      bestScoreDate,
       worstScore,
     });
 
@@ -97,7 +113,7 @@ export default function StatisticsScreen() {
         }
       >
         <View style={styles.statsGrid}>
-          <View style={styles.statCard}>
+          <View style={[styles.statCard, statCardLayoutStyle]}>
             <View style={styles.statIcon}>
               <Target size={24} color="#10b981" />
             </View>
@@ -106,7 +122,7 @@ export default function StatisticsScreen() {
             <Text style={styles.statSubtext}>Excluding penalties</Text>
           </View>
 
-          <View style={styles.statCard}>
+          <View style={[styles.statCard, statCardLayoutStyle]}>
             <View style={styles.statIcon}>
               <TrendingUp size={24} color="#3b82f6" />
             </View>
@@ -115,7 +131,7 @@ export default function StatisticsScreen() {
             <Text style={styles.statSubtext}>Wordles completed</Text>
           </View>
 
-          <View style={styles.statCard}>
+          <View style={[styles.statCard, statCardLayoutStyle]}>
             <View style={styles.statIcon}>
               <Trophy size={24} color="#f59e0b" />
             </View>
@@ -124,7 +140,7 @@ export default function StatisticsScreen() {
             <Text style={styles.statSubtext}>1st place finishes</Text>
           </View>
 
-          <View style={styles.statCard}>
+          <View style={[styles.statCard, statCardLayoutStyle]}>
             <View style={styles.statIcon}>
               <Trophy size={24} color="#8b5cf6" />
             </View>
@@ -135,16 +151,12 @@ export default function StatisticsScreen() {
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Score Details</Text>
-
+        <Text style={styles.sectionTitle}>Best Score</Text>
           <View style={styles.detailCard}>
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Best Score</Text>
-              <Text style={styles.detailValue}>{stats?.bestScore} points</Text>
-            </View>
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Worst Score</Text>
-              <Text style={styles.detailValue}>{stats?.worstScore} points</Text>
+            <View style={styles.scoreGuideRow}>
+              <Text style={styles.detailValue}>{stats?.bestScoreDate ? formatDateLong(stats.bestScoreDate) : 'N/A'}
+              </Text>
+              <Text style={styles.detailValue}>{stats?.bestScore ? ' ' + stats.bestScore + ' points' : 'N/A'}</Text>
             </View>
           </View>
         </View>
@@ -224,13 +236,21 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderRadius: 12,
     padding: 20,
-    width: '48%',
     alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+  },
+  statCardNarrow: {
+    width: '48%',
+  },
+  statCardUltraNarrow: {
+    width: '100%',
+  },
+  statCardWide: {
+    width: '23%',
   },
   statIcon: {
     marginBottom: 12,

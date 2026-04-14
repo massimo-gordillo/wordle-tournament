@@ -2,9 +2,11 @@ import { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, RefreshControl } from 'react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
-import { User, LogOut, Save } from 'lucide-react-native';
+import { LogOut, Save } from 'lucide-react-native';
 
 export default function AccountScreen() {
+  const MIN_DISPLAY_NAME_LENGTH = 4;
+  const MAX_DISPLAY_NAME_LENGTH = 15;
   const { user, signOut } = useAuth();
   const [displayName, setDisplayName] = useState('');
   const [loading, setLoading] = useState(true);
@@ -38,6 +40,14 @@ export default function AccountScreen() {
   const handleUpdateProfile = async () => {
     if (!displayName.trim()) {
       setError('Display name cannot be empty');
+      return;
+    }
+    if (displayName.trim().length < MIN_DISPLAY_NAME_LENGTH) {
+      setError(`Display name must be at least ${MIN_DISPLAY_NAME_LENGTH} characters`);
+      return;
+    }
+    if (displayName.trim().length > MAX_DISPLAY_NAME_LENGTH) {
+      setError(`Display name must be ${MAX_DISPLAY_NAME_LENGTH} characters or less`);
       return;
     }
 
@@ -91,14 +101,10 @@ export default function AccountScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
         }
       >
-        <View style={styles.profileCard}>
-          <View style={styles.avatarContainer}>
-            <View style={styles.avatar}>
-              <User size={40} color="#fff" />
-            </View>
-          </View>
+        <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Email</Text>
 
-          <Text style={styles.email}>{user?.email}</Text>
+        <Text style={styles.email}>{user?.email}</Text>
         </View>
 
         <View style={styles.section}>
@@ -113,6 +119,7 @@ export default function AccountScreen() {
               placeholder="Your display name"
               placeholderTextColor="#999"
               editable={!saving}
+              maxLength={MAX_DISPLAY_NAME_LENGTH}
             />
 
             {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -202,17 +209,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
-  },
-  avatarContainer: {
-    marginBottom: 16,
-  },
-  avatar: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: '#10b981',
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   email: {
     fontSize: 16,

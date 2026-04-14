@@ -111,6 +111,14 @@ export function formatDateShort(input: DateInput): string {
   return `${month} ${day}`;
 }
 
+export function formatDateLong(input: DateInput): string {
+  const d = toDate(input);
+  const y = d.getFullYear();
+  const month = monthShortNames[d.getMonth()] ?? '';
+  const day = pad2(d.getDate());
+  return `${month} ${day}, ${y}`;
+}
+
 /** Normalize DB / ISO strings to a calendar date (YYYY-MM-DD). */
 function toYyyyMmDd(dateStr: string): string | null {
   const m = dateStr.trim().match(/^(\d{4}-\d{2}-\d{2})/);

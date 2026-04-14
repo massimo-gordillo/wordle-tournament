@@ -14,6 +14,8 @@ import * as Linking from 'expo-linking';
 import { supabase } from '@/lib/supabase';
 
 export default function SignupScreen() {
+  const MIN_DISPLAY_NAME_LENGTH = 4;
+  const MAX_DISPLAY_NAME_LENGTH = 15;
   const [email, setEmail] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [password, setPassword] = useState('');
@@ -41,6 +43,14 @@ export default function SignupScreen() {
     setError('');
 
     const trimmedDisplayName = displayName.trim();
+    if (trimmedDisplayName.length < MIN_DISPLAY_NAME_LENGTH) {
+      setError(`Display name must be at least ${MIN_DISPLAY_NAME_LENGTH} characters`);
+      return;
+    }
+    if (trimmedDisplayName.length > MAX_DISPLAY_NAME_LENGTH) {
+      setError(`Display name must be ${MAX_DISPLAY_NAME_LENGTH} characters or less`);
+      return;
+    }
     const emailRedirectTo = Linking.createURL('(tabs)');
 
     const { data, error: signUpError } = await supabase.auth.signUp({
@@ -112,7 +122,7 @@ export default function SignupScreen() {
             onChangeText={setDisplayName}
             autoCorrect={false}
             autoCapitalize="words"
-            maxLength={50}
+            maxLength={MAX_DISPLAY_NAME_LENGTH}
             editable={!loading}
           />
 
