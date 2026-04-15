@@ -12,10 +12,24 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.heavyatom.wordlebattle",
       "buildNumber": "1",
-      "usesAppleSignIn": true
+      "usesAppleSignIn": true,
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
-      "package": "com.heavyatom.wordlebattle"
+      "package": "com.heavyatom.wordlebattle",
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "wordle-battle"
+            }
+          ]
+        }
+      ]
     },
     "web": {
       "bundler": "metro",
