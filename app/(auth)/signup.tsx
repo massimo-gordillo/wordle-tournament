@@ -99,7 +99,7 @@ export default function SignupScreen() {
     >
       <View style={styles.content}>
         <Text style={styles.title}>Create Account</Text>
-        <Text style={styles.subtitle}>Join Wordle Tournaments</Text>
+        <Text style={styles.subtitle}>Join Word Tournaments</Text>
 
         <View style={styles.form}>
           <TextInput

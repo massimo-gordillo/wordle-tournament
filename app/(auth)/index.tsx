@@ -38,8 +38,8 @@ export default function LoginScreen() {
       style={styles.container}
     >
       <View style={styles.content}>
-        <Text style={styles.title}>Wordle Tournaments</Text>
-        <Text style={styles.subtitle}>Track your daily Wordle scores</Text>
+        <Text style={styles.title}>Word Tournaments</Text>
+        <Text style={styles.subtitle}>Track your daily Word scores</Text>
 
         <AppleSignInButton />
 

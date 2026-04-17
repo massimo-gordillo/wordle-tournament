@@ -128,7 +128,7 @@ export default function StatisticsScreen() {
             </View>
             <Text style={styles.statValue}>{stats?.totalSubmissions}</Text>
             <Text style={styles.statLabel}>Total Submissions</Text>
-            <Text style={styles.statSubtext}>Wordles completed</Text>
+            <Text style={styles.statSubtext}>Word Games completed</Text>
           </View>
 
           <View style={[styles.statCard, statCardLayoutStyle]}>

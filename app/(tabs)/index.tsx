@@ -89,12 +89,12 @@ export default function DailySubmissionScreen() {
     const maxRows = config?.maxSubmissionRows ?? 6;
     const hasEmojiRows = rowCount > 0;
     if (!hasEmojiRows) {
-      devLog('parseWordle: no emoji rows found', { text });
+      devLog('parseWord: no emoji rows found', { text });
       return null;
     }
 
     if (rowCount > maxRows) {
-      devLog('parseWordle: too many rows', { rowCount, maxRows });
+      devLog('parseWord: too many rows', { rowCount, maxRows });
       return null;
     }
 
@@ -124,7 +124,7 @@ export default function DailySubmissionScreen() {
       // Each row must be exactly 5 squares after normalization
       if (visibleSquares !== 5) {
         rowShapeValid = false;
-        devLog('parseWordle: invalid row shape (normalized length)', {
+        devLog('parseWord: invalid row shape (normalized length)', {
           line,
           onlySquares,
           rowChars,
@@ -139,7 +139,7 @@ export default function DailySubmissionScreen() {
     // Total squares must be a multiple of 5 and at least 5
     const squaresMultipleOfFive = totalSquares >= 5 && totalSquares % 5 === 0;
     if (!squaresMultipleOfFive) {
-      devLog('parseWordle: total squares invalid', { totalSquares });
+      devLog('parseWord: total squares invalid', { totalSquares });
       return null;
     }
 
@@ -151,7 +151,7 @@ export default function DailySubmissionScreen() {
 
     // If maxRows rows and final row is not all green, treat as failure
     if (rowCount === maxRows && !allGreen) {
-      devLog('parseWordle: max rows, final row not all green -> score -2', {
+      devLog('parseWord: max rows, final row not all green -> score -2', {
         rowCount,
         lastRowChars,
         normalizedGrid,
@@ -161,7 +161,7 @@ export default function DailySubmissionScreen() {
 
     // For fewer than 6 rows, final row must be all green
     if (rowCount < 6 && !allGreen) {
-      devLog('parseWordle: <6 rows and final row not all green', {
+      devLog('parseWord: <6 rows and final row not all green', {
         rowCount,
         lastRowChars,
       });
@@ -196,7 +196,7 @@ export default function DailySubmissionScreen() {
       score,
       normalizedGrid,
     };
-    devLog('parseWordle: parsed successfully', debugInfo);
+    devLog('parseWord: parsed successfully', debugInfo);
 
     return { guesses, score, normalizedGrid };
   };
@@ -250,7 +250,7 @@ export default function DailySubmissionScreen() {
 
   const handleSubmit = async () => {
     if (!submissionText.trim()) {
-      setError('Please paste your result for today\'s Wordle');
+      setError('Please paste your result for today\'s Word Game');
       return;
     }
 
@@ -264,13 +264,13 @@ export default function DailySubmissionScreen() {
 
     const parsed = parseWordle(submissionText);
     if (!parsed) {
-      setError('Invalid Wordle grid. Please paste the complete result including the emoji rows.');
+      setError('Invalid Word Game grid. Please paste the complete result including the emoji rows.');
       setLoading(false);
       return;
     }
 
     if (!parsed.normalizedGrid) {
-      devLog('parseWordle: missing normalizedGrid on parsed result', parsed);
+      devLog('parseWord: missing normalizedGrid on parsed result', parsed);
       setError('Something went wrong parsing your result. Please try pasting it again.');
       setLoading(false);
       return;
@@ -297,8 +297,8 @@ export default function DailySubmissionScreen() {
     if (dbError) {
       const message = dbError.message || 'Unable to save submission';
       devLog('handleSubmit: backend error', { message, dbError });
-      if (message.toLowerCase().includes('invalid wordle grid')) {
-        setError('Invalid Wordle grid. Please paste the complete result including the emoji rows.');
+      if (message.toLowerCase().includes('invalid word grid')) {
+        setError('Invalid Word grid. Please paste the complete result including the emoji rows.');
       } else {
         setError(message);
       }
@@ -354,13 +354,13 @@ export default function DailySubmissionScreen() {
       }
     >
       <View style={styles.header}>
-        <Text style={styles.title}>Daily Wordle Submission</Text>
+        <Text style={styles.title}>Daily Word Game Submission</Text>
         <Text style={styles.timer}>{timeUntilCutoff}</Text>
       </View>
 
       <View style={styles.instructionsCard}>
         <Text style={styles.instructionsTitle}>How to submit:</Text>
-        <Text style={styles.instructionsText}>1. Play today's Wordle</Text>
+        <Text style={styles.instructionsText}>1. Play today's Word Game</Text>
         <Text style={styles.instructionsText}>2. Tap the Share button</Text>
         <Text style={styles.instructionsText}>3. Paste the complete result below</Text>
       </View>
@@ -368,7 +368,7 @@ export default function DailySubmissionScreen() {
       <View style={styles.formCard}>
         <TextInput
           style={styles.textArea}
-          placeholder={isPastCutoff ? "Submission window closed" : "Paste your Wordle result here..."}
+          placeholder={isPastCutoff ? "Submission window closed" : "Paste your Word Game result here..."}
           placeholderTextColor="#999"
           value={submissionText}
           onChangeText={setSubmissionText}

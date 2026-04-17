@@ -1067,11 +1067,11 @@ const styles = StyleSheet.create({
     color: '#10b981',
     fontWeight: '500',
   },
-  wordleGrid: {
+  wordGrid: {
     alignItems: 'center',
     paddingVertical: 8,
   },
-  wordleRow: {
+  wordRow: {
     fontSize: 20,
     marginBottom: 2,
     letterSpacing: 4,

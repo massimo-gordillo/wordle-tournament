@@ -21,18 +21,18 @@ export function DailySubmissionCard({
   score,
   submissionText,
 }: Props) {
-  const renderWordleGrid = (text: string) => {
+  const renderWordGrid = (text: string) => {
     const lines = text.split('\n');
     const gridLines = lines
       .map(rawLine => rawLine.replace(/[^BYG]/g, ''))
       .filter(line => line.length > 0);
 
     return (
-      <View style={styles.wordleGrid}>
+      <View style={styles.wordGrid}>
         {gridLines.map((line, index) => (
           <Text
             key={index}
-            style={styles.wordleRow}
+            style={styles.wordRow}
             selectable={variant === 'chat'}
           >
             {line
@@ -61,7 +61,7 @@ export function DailySubmissionCard({
           </Text>
         </View>
         {!didSubmit && <Text style={styles.statusText}>No submission (-2)</Text>}
-        {didSubmit && submissionText ? renderWordleGrid(submissionText) : null}
+        {didSubmit && submissionText ? renderWordGrid(submissionText) : null}
         {dateLabel ? <Text style={styles.dateLabel}>{formatDateOrToday(dateLabel)}</Text> : null}
       </View>
     </View>
@@ -120,11 +120,11 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: '#4b5563',
   },
-  wordleGrid: {
+  wordGrid: {
     marginTop: 0,
     alignItems: 'center',
   },
-  wordleRow: {
+  wordRow: {
     fontSize: 20,
     marginBottom: 1,
     letterSpacing: 1,

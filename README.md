@@ -1,14 +1,14 @@
-# Wordle Tournament Tracker
+# Word Tournament Tracker
 
-A full-stack React Native mobile application for tracking daily Wordle scores and competing in tournaments with friends.
+A full-stack React Native mobile application for tracking your daily scores in your favourite Word game and competing in tournaments with friends.
 
 ## Features
 
 ### Daily Submissions
-- Submit your Wordle results once per day
+- Submit your Word results once per day
 - Automatic score calculation based on number of guesses
 - Countdown timer showing time until 11 PM EST cutoff
-- Visual display of submitted Wordle grid
+- Visual display of submitted Word grid
 - Scores automatically applied to all active tournaments
 
 ### Tournaments
@@ -39,7 +39,7 @@ A full-stack React Native mobile application for tracking daily Wordle scores an
 ### Leaderboards & Results
 - Real-time tournament leaderboards
 - View yesterday's submissions from all participants
-- See Wordle grids from other players
+- See Word grids from other players
 - Results hidden until all players submit or 11 PM EST cutoff
 - Forfeit option for users who want to leave tournaments
 
@@ -105,7 +105,7 @@ A full-stack React Native mobile application for tracking daily Wordle scores an
 - `id` - UUID primary key
 - `user_id` - Foreign key to users
 - `submission_date` - Date of submission (EST)
-- `submission_text` - Full Wordle share output
+- `submission_text` - Full Word share output
 - `wordle_score` - Calculated score
 - `submitted_at` - Submission timestamp
 - UNIQUE constraint on (user_id, submission_date)
@@ -133,7 +133,7 @@ A full-stack React Native mobile application for tracking daily Wordle scores an
    - One submission per user per day
    - Submission window: 12:00 AM - 11:00 PM EST
    - No resubmissions allowed
-   - Full trust model - no validation of Wordle content
+   - Full trust model - no validation of Word content
    - Submissions apply to ALL active tournaments user has joined
 
 4. **Penalties**

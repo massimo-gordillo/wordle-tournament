@@ -1,4 +1,4 @@
-// --- EST / Wordle calendar day (submission dates, cutoff) ---
+// --- EST / Word calendar day (submission dates, cutoff) ---
 
 export const EST_OFFSET = -5;
 export const EDT_OFFSET = -4;
@@ -126,7 +126,7 @@ function toYyyyMmDd(dateStr: string): string | null {
 }
 
 /**
- * Renders a submission date label, using "Today" when it matches the app's Wordle day (EST),
+ * Renders a submission date label, using "Today" when it matches the app's Word day (EST),
  * same as `getTodayDateEST`. Pass either `YYYY-MM-DD`, a literal `"Today"`, or any string
  * `formatDateShort` accepts.
  */
