@@ -68,7 +68,7 @@ export function TournamentChatSection({
 
   return (
     <View style={styles.section}>
-      <Text style={styles.sectionTitle}>Tournament chat</Text>
+      <Text style={styles.sectionTitle}>Tournament Chat</Text>
 
       <View style={styles.feed}>
         {messages.length === 0 ? (

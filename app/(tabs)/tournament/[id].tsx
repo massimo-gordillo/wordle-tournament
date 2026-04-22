@@ -17,7 +17,7 @@ import { useLocalSearchParams, router, useFocusEffect } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAppConfig } from '@/contexts/ConfigContext';
 import { supabase } from '@/lib/supabase';
-import { ChevronLeft, Trophy } from 'lucide-react-native';
+import { ChevronDown, ChevronLeft, ChevronUp, Trophy } from 'lucide-react-native';
 import {
   getTodayDateEST,
   getYesterdayDateEST,
@@ -77,6 +77,8 @@ export default function TournamentDetailScreen() {
   const [forfeitLoading, setForfeitLoading] = useState(false);
   const [chatMessages, setChatMessages] = useState<TournamentChatMessage[]>([]);
   const [chatSending, setChatSending] = useState(false);
+  const [allSubmissionsCollapsed, setAllSubmissionsCollapsed] = useState(false);
+  const [tournamentInfoCollapsed, setTournamentInfoCollapsed] = useState(true);
   const [winnerUserIds, setWinnerUserIds] = useState<Set<string>>(new Set());
   const [showFanfare, setShowFanfare] = useState(false);
   const confettiValues = useRef(
@@ -94,6 +96,8 @@ export default function TournamentDetailScreen() {
       fanfareOpacity.setValue(0);
       fanfareScale.setValue(0.8);
       confettiValues.forEach(v => v.setValue(0));
+      setAllSubmissionsCollapsed(false);
+      setTournamentInfoCollapsed(true);
       loadTournamentData();
     }, [confettiValues, fanfareOpacity, fanfareScale, id])
   );
@@ -686,122 +690,152 @@ export default function TournamentDetailScreen() {
 
         {/* All Results section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>All Submissions</Text>
-          {participants.length === 0 ? (
-            <Text style={styles.emptyText}>No players in this tournament</Text>
-          ) : allSubmissions.length === 0 ? (
-            <Text style={styles.emptyText}>No submissions yet</Text>
-          ) : (
+          <TouchableOpacity
+            style={styles.collapsibleHeader}
+            onPress={() => setAllSubmissionsCollapsed(prev => !prev)}
+          >
+            <Text style={styles.sectionTitle}>All Submissions</Text>
+            {allSubmissionsCollapsed ? (
+              <ChevronDown size={20} color="#1a1a1a" />
+            ) : (
+              <ChevronUp size={20} color="#1a1a1a" />
+            )}
+          </TouchableOpacity>
+          {!allSubmissionsCollapsed && (
             <>
-              {(() => {
-                const startDateStr = tournament.start_date.slice(0, 10);
-                const endDateStr = tournament.end_date.slice(0, 10);
-                const todayStr = getTodayDateEST();
-                const yesterdayStr = getYesterdayDateEST();
+              {participants.length === 0 ? (
+                <Text style={styles.emptyText}>No players in this tournament</Text>
+              ) : allSubmissions.length === 0 ? (
+                <Text style={styles.emptyText}>No submissions yet</Text>
+              ) : (
+                <>
+                  {(() => {
+                    const startDateStr = tournament.start_date.slice(0, 10);
+                    const endDateStr = tournament.end_date.slice(0, 10);
+                    const todayStr = getTodayDateEST();
+                    const yesterdayStr = getYesterdayDateEST();
 
-                // Determine last visible date:
-                // - Always show all fully past days.
-                // - Only show "today" when results are ready or the tournament is completed.
-                let maxDateStr: string | null = null;
+                    // Determine last visible date:
+                    // - Always show all fully past days.
+                    // - Only show "today" when results are ready or the tournament is completed.
+                    let maxDateStr: string | null = null;
 
-                if (isCompleted || resultsReady) {
-                  maxDateStr = todayStr <= endDateStr ? todayStr : endDateStr;
-                } else {
-                  const candidate =
-                    yesterdayStr <= endDateStr ? yesterdayStr : endDateStr;
-                  maxDateStr = candidate >= startDateStr ? candidate : null;
-                }
+                    if (isCompleted || resultsReady) {
+                      maxDateStr = todayStr <= endDateStr ? todayStr : endDateStr;
+                    } else {
+                      const candidate =
+                        yesterdayStr <= endDateStr ? yesterdayStr : endDateStr;
+                      maxDateStr = candidate >= startDateStr ? candidate : null;
+                    }
 
-                const days: string[] = [];
+                    const days: string[] = [];
 
-                const addOneDay = (dateStr: string) => {
-                  const [y, m, d] = dateStr.split('-').map(Number);
-                  const dt = new Date(y, m - 1, d);
-                  dt.setDate(dt.getDate() + 1);
-                  const year = dt.getFullYear();
-                  const month = String(dt.getMonth() + 1).padStart(2, '0');
-                  const day = String(dt.getDate()).padStart(2, '0');
-                  return `${year}-${month}-${day}`;
-                };
+                    const addOneDay = (dateStr: string) => {
+                      const [y, m, d] = dateStr.split('-').map(Number);
+                      const dt = new Date(y, m - 1, d);
+                      dt.setDate(dt.getDate() + 1);
+                      const year = dt.getFullYear();
+                      const month = String(dt.getMonth() + 1).padStart(2, '0');
+                      const day = String(dt.getDate()).padStart(2, '0');
+                      return `${year}-${month}-${day}`;
+                    };
 
-                if (maxDateStr && startDateStr <= maxDateStr) {
-                  let current = startDateStr;
-                  while (current <= maxDateStr) {
-                    days.push(current);
-                    current = addOneDay(current);
-                  }
-                }
+                    if (maxDateStr && startDateStr <= maxDateStr) {
+                      let current = startDateStr;
+                      while (current <= maxDateStr) {
+                        days.push(current);
+                        current = addOneDay(current);
+                      }
+                    }
 
-                // Show most recent day first
-                const orderedDays = [...days].reverse();
+                    // Show most recent day first
+                    const orderedDays = [...days].reverse();
+                    if (orderedDays.length === 0) {
+                      return (
+                        <Text style={styles.emptyText}>Waiting on Submissions</Text>
+                      );
+                    }
 
-                return orderedDays.map(date => {
-                  const submissionsForDay = allSubmissions.filter(
-                    s => s.submission_date === date,
-                  );
+                    return orderedDays.map(date => {
+                      const submissionsForDay = allSubmissions.filter(
+                        s => s.submission_date === date,
+                      );
 
-                  return (
-                    <View key={date} style={styles.resultsDay}>
-                      <Text style={styles.resultsDayTitle}>
-                        {formatDateShort(date)}
-                      </Text>
-                      <View style={styles.resultsDayDivider} />
-                      {participants.map(p => {
-                        const sub = submissionsForDay.find(
-                          s => s.user_id === p.user_id,
-                        );
-                        const isForfeitPenaltyDay =
-                          p.forfeited &&
-                          p.forfeited_at_date != null &&
-                          date >= p.forfeited_at_date;
-                        const isPenaltyRow =
-                          sub?.submission_text === NO_SUBMISSION_PENALTY_LABEL;
-                        const didSubmit =
-                          !!sub && !isForfeitPenaltyDay && !isPenaltyRow;
-                        const score = isForfeitPenaltyDay
-                          ? -2
-                          : isPenaltyRow
-                          ? -2
-                          : typeof sub?.wordle_score === 'number'
-                          ? sub.wordle_score
-                          : -2;
-                        const submissionText = isForfeitPenaltyDay || isPenaltyRow
-                          ? undefined
-                          : sub?.submission_text;
+                      return (
+                        <View key={date} style={styles.resultsDay}>
+                          <Text style={styles.resultsDayTitle}>
+                            {formatDateShort(date)}
+                          </Text>
+                          <View style={styles.resultsDayDivider} />
+                          {participants.map(p => {
+                            const sub = submissionsForDay.find(
+                              s => s.user_id === p.user_id,
+                            );
+                            const isForfeitPenaltyDay =
+                              p.forfeited &&
+                              p.forfeited_at_date != null &&
+                              date >= p.forfeited_at_date;
+                            const isPenaltyRow =
+                              sub?.submission_text === NO_SUBMISSION_PENALTY_LABEL;
+                            const didSubmit =
+                              !!sub && !isForfeitPenaltyDay && !isPenaltyRow;
+                            const score = isForfeitPenaltyDay
+                              ? -2
+                              : isPenaltyRow
+                              ? -2
+                              : typeof sub?.wordle_score === 'number'
+                              ? sub.wordle_score
+                              : -2;
+                            const submissionText = isForfeitPenaltyDay || isPenaltyRow
+                              ? undefined
+                              : sub?.submission_text;
 
-                        return (
-                          <DailySubmissionCard
-                            key={p.user_id + date}
-                            dateLabel={date}
-                            playerName={p.display_name}
-                            didSubmit={didSubmit}
-                            score={score}
-                            submissionText={submissionText}
-                          />
-                        );
-                      })}
-                    </View>
-                  );
-                });
-              })()}
+                            return (
+                              <DailySubmissionCard
+                                key={p.user_id + date}
+                                dateLabel={date}
+                                playerName={p.display_name}
+                                didSubmit={didSubmit}
+                                score={score}
+                                submissionText={submissionText}
+                              />
+                            );
+                          })}
+                        </View>
+                      );
+                    });
+                  })()}
+                </>
+              )}
             </>
           )}
         </View>
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Tournament Info</Text>
-          <View style={styles.infoCard}>
-            
-            <Text style={styles.infoLabel}>Status</Text>
-            <Text style={styles.infoValue}>{tournament.status.toUpperCase()}</Text>
-            <Text style={styles.infoLabel}>Dates</Text>
-            <Text style={styles.infoValue}>
-              {formatDateShort(tournament.start_date)} - {formatDateShort(
-                tournament.end_date,
-              )}
-            </Text>
-            <Text style={styles.infoLabel}>Join Code</Text>
-            <Text style={styles.infoValue}>{tournament.join_code}</Text>
-          </View>
+          <TouchableOpacity
+            style={styles.collapsibleHeader}
+            onPress={() => setTournamentInfoCollapsed(prev => !prev)}
+          >
+            <Text style={styles.sectionTitle}>Tournament Info</Text>
+            {tournamentInfoCollapsed ? (
+              <ChevronDown size={20} color="#1a1a1a" />
+            ) : (
+              <ChevronUp size={20} color="#1a1a1a" />
+            )}
+          </TouchableOpacity>
+          {!tournamentInfoCollapsed && (
+            <View style={styles.infoCard}>
+              <Text style={styles.infoLabel}>Status</Text>
+              <Text style={styles.infoValue}>{tournament.status.toUpperCase()}</Text>
+              <Text style={styles.infoLabel}>Dates</Text>
+              <Text style={styles.infoValue}>
+                {formatDateShort(tournament.start_date)} - {formatDateShort(
+                  tournament.end_date,
+                )}
+              </Text>
+              <Text style={styles.infoLabel}>Join Code</Text>
+              <Text style={styles.infoValue}>{tournament.join_code}</Text>
+            </View>
+          )}
         </View>
         {tournament.status === 'active' &&
           participants.some(p => p.user_id === user?.id && !p.forfeited) && (
@@ -962,6 +996,11 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '600',
     color: '#1a1a1a',
+  },
+  collapsibleHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   leaderboardStatus: {
     fontSize: 14,
