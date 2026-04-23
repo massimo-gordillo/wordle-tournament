@@ -7,6 +7,9 @@ dist/
 web-build/
 expo-env.d.ts
 
+#android build
+android/
+
 # native
 *.orig.*
 *.jks
@@ -36,3 +39,6 @@ supabase/seed_play_review.generated.sql
 
 # typescript
 *.tsbuildinfo
+
+#notes
+docs/testingNotes

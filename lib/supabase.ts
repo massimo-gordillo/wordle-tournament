@@ -1,10 +1,27 @@
 import 'react-native-url-polyfill/auto';
 import { createClient } from '@supabase/supabase-js';
 import * as SecureStore from 'expo-secure-store';
+import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 
-const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!;
+type AppExtra = {
+  supabaseUrl?: string;
+  supabaseAnonKey?: string;
+};
+
+const appExtra = (Constants.expoConfig?.extra ?? {}) as AppExtra;
+const supabaseUrl = (process.env.EXPO_PUBLIC_SUPABASE_URL ?? appExtra.supabaseUrl)?.trim();
+const supabaseAnonKey = (process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? appExtra.supabaseAnonKey)?.trim();
+const hasSupabaseConfig = Boolean(supabaseUrl && supabaseAnonKey);
+const fallbackUrl = 'https://placeholder.supabase.co';
+const fallbackAnonKey = 'placeholder-anon-key';
+
+if (!hasSupabaseConfig && __DEV__) {
+  // eslint-disable-next-line no-console
+  console.error(
+    'Missing Supabase config. Set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY in your environment.'
+  );
+}
 
 // Custom storage adapter for secure token storage
 const ExpoSecureStoreAdapter = {
@@ -37,11 +54,15 @@ const ExpoSecureStoreAdapter = {
   },
 };
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    storage: ExpoSecureStoreAdapter,
-    autoRefreshToken: true,
-    persistSession: true,
-    detectSessionInUrl: false,
-  },
-});
+export const supabase = createClient(
+  hasSupabaseConfig ? supabaseUrl! : fallbackUrl,
+  hasSupabaseConfig ? supabaseAnonKey! : fallbackAnonKey,
+  {
+    auth: {
+      storage: ExpoSecureStoreAdapter,
+      autoRefreshToken: true,
+      persistSession: true,
+      detectSessionInUrl: false,
+    },
+  }
+);

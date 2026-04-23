@@ -9,11 +9,15 @@
     "lint": "expo lint",
     "typecheck": "tsc --noEmit",
     "supabase:play-review-seed": "node scripts/generate-play-review-seed.mjs",
-    "supabase:status": "supabase status",
-    "supabase:db:push": "supabase db push && npm run supabase:play-review-seed",
-    "supabase:db:reset": "supabase db reset && npm run supabase:play-review-seed && npm run supabase:local-test-users-seed",
+    "supabase:status": "npx supabase status",
+    "supabase:db:push": "npx supabase db push && npm run supabase:play-review-seed",
+    "supabase:db:reset": "npx supabase db reset && npm run supabase:play-review-seed && npm run supabase:local-test-users-seed",
     "supabase:local-test-users-seed": "node scripts/seed-local-test-users.mjs",
-    "supabase:functions:deploy": "supabase functions deploy update-leaderboard"
+    "test:db": "npx supabase test db",
+    "test:cron-edge": "deno test supabase/functions/edge-run-daily-cron/cron_handler_test.ts",
+    "supabase:functions:deploy": "npx supabase functions deploy update-leaderboard",
+    "android": "expo run:android",
+    "ios": "expo run:ios"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.2",

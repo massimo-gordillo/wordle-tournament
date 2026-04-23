@@ -1,4 +1,4 @@
-# Wordle Tournament Daily Cron Job
+# Word Tournament Daily Cron Job
 
 ## Overview
 This cron job should run daily at 11:00 PM EST to handle:
@@ -101,36 +101,16 @@ BEGIN
     last_updated = EXCLUDED.last_updated;
 
   -- ============================================================================
-  -- STEP 2b: Auto-forfeit users with N consecutive penalty days
+  -- STEP 2b: Auto-forfeit (per tournament; see migration 20260423120000)
   -- ============================================================================
 
   -- For each active tournament + participant:
-  -- - Tournament must have started on or after the first day of the streak window
-  -- - Participant must have a penalty submission for each day in [first_streak_day, today_date]
-  --   (we only check within that N-day window)
-  -- - Call the shared forfeit_tournament_internal helper so behavior stays consistent
-  WITH eligible_forfeit AS (
-    SELECT
-      tp.tournament_id,
-      tp.user_id
-    FROM tournament_participants tp
-    JOIN tournaments t ON t.id = tp.tournament_id
-    WHERE
-      t.status = 'active'
-      AND tp.forfeited = false
-      -- Tournament started on or after the first day of this streak window
-      AND t.start_date >= first_streak_day
-      -- User has a penalty submission on every day in the streak window
-      AND (
-        SELECT COUNT(DISTINCT ds.submission_date)
-        FROM daily_submissions ds
-        WHERE ds.user_id = tp.user_id
-          AND ds.submission_text = 'NO SUBMISSION - PENALTY'
-          AND ds.submission_date BETWEEN first_streak_day AND today_date
-      ) >= v_auto_n
-  )
-  PERFORM forfeit_tournament_internal(tournament_id, user_id)
-  FROM eligible_forfeit;
+  -- - Tournament must have been running long enough: (today_date - start_date) >= (N - 1)
+  --   with N = auto_forfeit_consecutive_penalties from app_config (default 3).
+  -- - For each offset i in 0 .. N-1, calendar day (today_date - i) that falls inside
+  --   [start_date, end_date] must have a daily_submissions row for that user with
+  --   submission_text = 'NO SUBMISSION - PENALTY' (no missing penalty day in that window).
+  -- - Call forfeit_tournament_internal(tournament_id, user_id) for each eligible row.
 
   -- ============================================================================
   -- STEP 3: Close tournaments that have reached (or passed) their end date

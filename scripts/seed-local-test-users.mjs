@@ -2,7 +2,7 @@
  * Creates local manual-testing auth accounts via Supabase Admin API after `supabase db reset`.
  * The auth.users trigger creates matching public.users rows.
  *
- * Optional env vars (.env or process env):
+ * Optional env vars (.env, then .env.local — local overrides remote for same keys):
  * - LOCAL_TESTING_EMAIL — template with a single "!" placeholder, e.g. email!@hotmail.com
  *   becomes email0@..., email1@..., etc. If there is no "!", the index is inserted before "@"
  *   (user@x.com -> user0@x.com).
@@ -18,12 +18,12 @@ import { readFileSync } from 'fs';
 import { resolve } from 'path';
 
 const ROOT = resolve(process.cwd());
-const ENV_PATH = resolve(ROOT, '.env');
+const ENV_FILES = [resolve(ROOT, '.env'), resolve(ROOT, '.env.local')];
 
-function loadDotenvIfPresent() {
+function applyEnvFile(envPath, { overrideExistingKeys }) {
   let raw;
   try {
-    raw = readFileSync(ENV_PATH, 'utf8');
+    raw = readFileSync(envPath, 'utf8');
   } catch {
     return;
   }
@@ -36,7 +36,7 @@ function loadDotenvIfPresent() {
     if (eq === -1) continue;
 
     const key = trimmed.slice(0, eq).trim();
-    if (process.env[key] !== undefined) continue;
+    if (!overrideExistingKeys && process.env[key] !== undefined) continue;
 
     let value = trimmed.slice(eq + 1).trim();
     if (
@@ -47,6 +47,14 @@ function loadDotenvIfPresent() {
     }
     process.env[key] = value;
   }
+}
+
+function loadDotenvIfPresent() {
+  const envPath = ENV_FILES[0];
+  const localEnvPath = ENV_FILES[1];
+
+  applyEnvFile(envPath, { overrideExistingKeys: false });
+  applyEnvFile(localEnvPath, { overrideExistingKeys: true });
 }
 
 function requireEnv(name) {
@@ -158,14 +166,30 @@ async function ensureAuthUser(baseUrl, headers, email, password) {
     );
   }
 
-  await requestJson(`${baseUrl}/auth/v1/admin/users/${existing.id}`, {
-    method: 'PATCH',
-    headers,
-    body: JSON.stringify({
-      password,
-      email_confirm: true,
-    }),
+  const updatePayload = JSON.stringify({
+    password,
+    email_confirm: true,
   });
+  const updateUrl = `${baseUrl}/auth/v1/admin/users/${existing.id}`;
+
+  try {
+    await requestJson(updateUrl, {
+      method: 'PATCH',
+      headers,
+      body: updatePayload,
+    });
+  } catch (error) {
+    const msg = String(error?.message || '');
+    if (!msg.includes('failed (405)')) {
+      throw error;
+    }
+
+    await requestJson(updateUrl, {
+      method: 'PUT',
+      headers,
+      body: updatePayload,
+    });
+  }
 
   return existing.id;
 }

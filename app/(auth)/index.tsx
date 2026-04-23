@@ -3,6 +3,8 @@ import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator,
 import { router } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { AppleSignInButton } from '@/components/AppleSignInButton';
+import * as AppleAuthentication from 'expo-apple-authentication';
+import { supabase } from '@/lib/supabase';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
