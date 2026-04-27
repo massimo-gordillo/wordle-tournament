@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity, Alert, RefreshControl, Platform } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase';
 import { ChevronLeft, Users, Copy, Play, Trash2 } from 'lucide-react-native';
 import { useAppConfig } from '@/contexts/ConfigContext';
 import { copy, fillCopyTemplate } from '@/app/copy/strings';
+import { calendarDaysInclusiveCount } from '@/lib/dateUtils';
 
 /** Cross-platform confirm: Alert.alert on native, window.confirm on web (Alert.alert doesn't work on web). */
 function confirmDiscard(
@@ -33,18 +34,9 @@ function confirmDiscard(
   ]);
 }
 
-function formatDurationDaysInclusive(start: Date, end: Date): string {
-  const days =
-    Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-  if (days === 3) return copy.draftTournament.duration3;
-  if (days === 7) return copy.draftTournament.duration7;
-  if (days === 14) return copy.draftTournament.duration14;
-  if (days === 28) return copy.draftTournament.duration28;
-  return fillCopyTemplate(copy.draftTournament.durationDaysTemplate, { days });
-}
-
-function formatDurationDaysExclusive(start: Date, end: Date): string {
-  const days = Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+/** Calendar days from `start_date` / `end_date` (same inclusive rule as tournament creation). */
+function formatTournamentLengthLabel(startDateStr: string, endDateStr: string): string {
+  const days = calendarDaysInclusiveCount(startDateStr, endDateStr);
   if (days === 3) return copy.draftTournament.duration3;
   if (days === 7) return copy.draftTournament.duration7;
   if (days === 14) return copy.draftTournament.duration14;
@@ -81,37 +73,11 @@ export default function DraftTournamentScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [leaving, setLeaving] = useState(false);
 
-  useEffect(() => {
-    loadTournamentData();
-  }, []);
-
-  const loadTournamentData = async () => {
-    if (!id) return;
-
-    const { data: tournamentData } = await supabase
-      .from('tournaments')
-      .select('*')
-      .eq('id', id)
-      .maybeSingle();
-
-    if (!tournamentData) {
-      await loadParticipants();
-      setLoading(false);
-      return;
-    }
-
-    setTournament(tournamentData);
-    await loadParticipants();
-    setLoading(false);
-  };
-
-  const loadParticipants = async () => {
-    if (!id) return;
-
+  const loadParticipants = useCallback(async (tournamentId: string) => {
     const { data: participantData } = await supabase
       .from('tournament_participants')
       .select('id, user_id')
-      .eq('tournament_id', id);
+      .eq('tournament_id', tournamentId);
 
     if (!participantData) {
       return;
@@ -137,7 +103,65 @@ export default function DraftTournamentScreen() {
     }));
 
     setParticipants(formattedParticipants);
+  }, []);
+
+  const loadTournamentData = async () => {
+    if (!id) return;
+
+    const { data: tournamentData } = await supabase
+      .from('tournaments')
+      .select('*')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (!tournamentData) {
+      await loadParticipants(id);
+      setLoading(false);
+      return;
+    }
+
+    setTournament(tournamentData);
+    await loadParticipants(id);
+    setLoading(false);
   };
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadForRouteParam() {
+      if (!id) return;
+
+      setLoading(true);
+      setTournament(null);
+      setParticipants([]);
+
+      const { data: tournamentData } = await supabase
+        .from('tournaments')
+        .select('*')
+        .eq('id', id)
+        .maybeSingle();
+
+      if (cancelled) return;
+
+      if (!tournamentData) {
+        await loadParticipants(id);
+        if (cancelled) return;
+        setLoading(false);
+        return;
+      }
+
+      setTournament(tournamentData);
+      await loadParticipants(id);
+      if (cancelled) return;
+      setLoading(false);
+    }
+
+    void loadForRouteParam();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [id, loadParticipants]);
 
   const handleKickParticipant = (participant: Participant) => {
     if (!tournament || participant.user_id === user?.id) return;
@@ -148,7 +172,7 @@ export default function DraftTournamentScreen() {
         p_user_id: participant.user_id,
       });
 
-      await loadParticipants();
+      await loadParticipants(tournament.id);
     };
 
     if (Platform.OS === 'web' && typeof window !== 'undefined' && window.confirm) {
@@ -366,10 +390,7 @@ export default function DraftTournamentScreen() {
           <View style={styles.infoCard}>
             <Text style={styles.infoLabel}>{copy.draftTournament.tournamentLengthLabel}</Text>
             <Text style={styles.infoValue}>
-              {formatDurationDaysInclusive(
-                new Date(tournament.start_date),
-                new Date(tournament.end_date),
-              )}
+              {formatTournamentLengthLabel(tournament.start_date, tournament.end_date)}
             </Text>
           </View>
           <View style={styles.participantsSection}>
@@ -441,10 +462,7 @@ export default function DraftTournamentScreen() {
         <View style={styles.infoCard}>
           <Text style={styles.infoLabel}>{copy.draftTournament.tournamentLengthLabel}</Text>
           <Text style={styles.infoValue}>
-            {formatDurationDaysExclusive(
-              new Date(tournament.start_date),
-              new Date(tournament.end_date),
-            )}
+            {formatTournamentLengthLabel(tournament.start_date, tournament.end_date)}
           </Text>
         </View>
 
