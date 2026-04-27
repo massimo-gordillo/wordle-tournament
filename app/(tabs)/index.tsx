@@ -1,11 +1,13 @@
-import { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, RefreshControl } from 'react-native';
+import { useState, useEffect, useLayoutEffect, useCallback } from 'react';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, RefreshControl, Modal } from 'react-native';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { getTodayDateEST, getTimeUntilCutoff } from '@/lib/dateUtils';
 import { useAppConfig } from '@/contexts/ConfigContext';
 import { DailySubmissionCard } from '@/components/DailySubmissionCard';
 import { devLog } from '@/utils/logger';
+import { copy } from '@/app/copy/strings';
 
 interface Submission {
   submission_text: string;
@@ -17,10 +19,13 @@ const NO_SUBMISSION_PENALTY_LABEL = 'NO SUBMISSION - PENALTY';
 
 /** Placeholder for tournament_chat.message when message_type is result (grid lives on daily_submissions). */
 const RESULT_CHAT_PLACEHOLDER_MESSAGE = 'result';
+const PENDING_SIGNUP_INTRO_KEY = 'wt_pending_signup_intro';
 
 export default function DailySubmissionScreen() {
   const { user } = useAuth();
   const { config } = useAppConfig();
+  const router = useRouter();
+  const { showIntro } = useLocalSearchParams<{ showIntro?: string }>();
   const [submissionText, setSubmissionText] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -28,6 +33,25 @@ export default function DailySubmissionScreen() {
   const [timeUntilCutoff, setTimeUntilCutoff] = useState('');
   const [isPastCutoff, setIsPastCutoff] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [showIntroModal, setShowIntroModal] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    try {
+      return window.localStorage.getItem(PENDING_SIGNUP_INTRO_KEY) === '1';
+    } catch {
+      return false;
+    }
+  });
+
+  const dismissIntroModal = useCallback(() => {
+    setShowIntroModal(false);
+    if (typeof window !== 'undefined' && window.localStorage) {
+      try {
+        window.localStorage.removeItem(PENDING_SIGNUP_INTRO_KEY);
+      } catch {
+        // ignore
+      }
+    }
+  }, []);
 
   useEffect(() => {
     loadTodaySubmission();
@@ -36,17 +60,39 @@ export default function DailySubmissionScreen() {
     return () => clearInterval(interval);
   }, []);
 
+  // URL param may not reach this screen when navigating to `/(tabs)`; localStorage handles that.
+  // Do not clear localStorage here — React Strict Mode remounts in dev would drop the flag before dismiss.
+  useLayoutEffect(() => {
+    const fromParam = showIntro === '1';
+    let fromStorage = false;
+    if (typeof window !== 'undefined' && window.localStorage) {
+      try {
+        fromStorage = window.localStorage.getItem(PENDING_SIGNUP_INTRO_KEY) === '1';
+      } catch {
+        fromStorage = false;
+      }
+    }
+
+    if (fromParam || fromStorage) {
+      setShowIntroModal(true);
+    }
+
+    if (fromParam) {
+      router.replace('/(tabs)');
+    }
+  }, [showIntro, router]);
+
   const updateCountdown = () => {
     const cutoffHour = config?.cutoffHourEst ?? 23;
     const { hours, minutes, isPastCutoff: pastCutoff } = getTimeUntilCutoff(cutoffHour);
 
     if (pastCutoff) {
       setIsPastCutoff(true);
-      setTimeUntilCutoff('Submission window closed, opens tomorrow at 12:01AM EST');
+      setTimeUntilCutoff(copy.dailySubmission.closedWindow);
       return;
     }
 
-    setTimeUntilCutoff(`${hours}h ${minutes}m until cutoff`);
+    setTimeUntilCutoff(`${hours}h ${minutes}m ${copy.dailySubmission.cutoffCountdownSuffix}`);
     setIsPastCutoff(false);
   };
 
@@ -250,12 +296,12 @@ export default function DailySubmissionScreen() {
 
   const handleSubmit = async () => {
     if (!submissionText.trim()) {
-      setError('Please paste your result for today\'s Word Game');
+      setError(copy.dailySubmission.emptySubmissionError);
       return;
     }
 
     if (isPastCutoff) {
-      setError('Submission for today is closed, you can submit tomorrow\'s starting at 12:01AM EST.');
+      setError(copy.dailySubmission.pastCutoffError);
       return;
     }
 
@@ -264,14 +310,14 @@ export default function DailySubmissionScreen() {
 
     const parsed = parseWordle(submissionText);
     if (!parsed) {
-      setError('Invalid Word Game grid. Please paste the complete result including the emoji rows.');
+      setError(copy.dailySubmission.invalidGridError);
       setLoading(false);
       return;
     }
 
     if (!parsed.normalizedGrid) {
       devLog('parseWord: missing normalizedGrid on parsed result', parsed);
-      setError('Something went wrong parsing your result. Please try pasting it again.');
+      setError(copy.dailySubmission.parseFailedError);
       setLoading(false);
       return;
     }
@@ -295,10 +341,10 @@ export default function DailySubmissionScreen() {
     setLoading(false);
 
     if (dbError) {
-      const message = dbError.message || 'Unable to save submission';
+      const message = dbError.message || copy.dailySubmission.dbSaveFallbackError;
       devLog('handleSubmit: backend error', { message, dbError });
       if (message.toLowerCase().includes('invalid word grid')) {
-        setError('Invalid Word grid. Please paste the complete result including the emoji rows.');
+        setError(copy.dailySubmission.dbInvalidGridError);
       } else {
         setError(message);
       }
@@ -314,8 +360,78 @@ export default function DailySubmissionScreen() {
     }
   };
 
+  const introModal = (
+    <Modal
+      visible={showIntroModal}
+      transparent
+      animationType="fade"
+      onRequestClose={dismissIntroModal}
+    >
+      <View style={styles.modalBackdrop}>
+        <View style={styles.modalCard}>
+          <Text style={styles.modalTitle}>{copy.dailySubmission.introModal.title}</Text>
+          <Text style={styles.modalBodyTitle}>{copy.dailySubmission.introModal.submitSectionTitle}</Text>
+          <Text style={styles.modalBodyText}>{copy.dailySubmission.introModal.submitStep1}</Text>
+          <Text style={styles.modalBodyText}>{copy.dailySubmission.introModal.submitStep2}</Text>
+          <Text style={styles.modalBodyText}>{copy.dailySubmission.introModal.submitStep3}</Text>
+
+          <Text style={styles.modalBodyTitle}>{copy.dailySubmission.introModal.createSectionTitle}</Text>
+          <Text style={styles.modalBodyText}>{copy.dailySubmission.introModal.createStep1}</Text>
+          <Text style={styles.modalBodyText}>{copy.dailySubmission.introModal.createStep2}</Text>
+          <Text style={styles.modalBodyText}>{copy.dailySubmission.introModal.createStep3}</Text>
+
+          <Text style={styles.modalBodyTitle}>{copy.dailySubmission.introModal.joinSectionTitle}</Text>
+          <Text style={styles.modalBodyText}>{copy.dailySubmission.introModal.joinStep1}</Text>
+          <Text style={styles.modalBodyText}>{copy.dailySubmission.introModal.joinStep2}</Text>
+          <Text style={styles.modalBodyText}>{copy.dailySubmission.introModal.joinStep3}</Text>
+
+          <TouchableOpacity style={styles.modalButton} onPress={dismissIntroModal}>
+            <Text style={styles.modalButtonText}>{copy.dailySubmission.introModal.dismissButton}</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
+
   if (todaySubmission) {
     return (
+      <>
+        {introModal}
+        <ScrollView
+          style={styles.container}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+          }
+        >
+          <View style={styles.header}>
+            <Text style={styles.title}>{copy.dailySubmission.todaySubmissionTitle}</Text>
+            <Text style={styles.timer}>{timeUntilCutoff}</Text>
+          </View>
+
+          <DailySubmissionCard
+            dateLabel={copy.dailySubmission.todayDateLabel}
+            didSubmit
+            score={todaySubmission.wordle_score}
+            submissionText={todaySubmission.submission_text}
+          />
+
+          <View style={styles.infoCard}>
+            <Text style={styles.infoText}>
+              {copy.dailySubmission.scoreAppliedInfo}
+            </Text>
+            <Text style={styles.infoText}>
+              {copy.dailySubmission.nextSubmissionInfo}
+            </Text>
+          </View>
+        </ScrollView>
+      </>
+    );
+  }
+
+  return (
+    <>
+      {introModal}
+
       <ScrollView
         style={styles.container}
         refreshControl={
@@ -323,100 +439,118 @@ export default function DailySubmissionScreen() {
         }
       >
         <View style={styles.header}>
-          <Text style={styles.title}>Today's Submission</Text>
+          <Text style={styles.title}>{copy.dailySubmission.formTitle}</Text>
           <Text style={styles.timer}>{timeUntilCutoff}</Text>
         </View>
 
-        <DailySubmissionCard
-          dateLabel="Today"
-          didSubmit
-          score={todaySubmission.wordle_score}
-          submissionText={todaySubmission.submission_text}
-        />
-
-        <View style={styles.infoCard}>
-          <Text style={styles.infoText}>
-            Your score has been applied to all active tournaments you're participating in.
-          </Text>
-          <Text style={styles.infoText}>
-            Come back tomorrow for your next submission!
-          </Text>
+        <View style={styles.instructionsCard}>
+          <Text style={styles.instructionsTitle}>{copy.dailySubmission.instructionsTitle}</Text>
+          <Text style={styles.instructionsText}>{copy.dailySubmission.instruction1}</Text>
+          <Text style={styles.instructionsText}>{copy.dailySubmission.instruction2}</Text>
+          <Text style={styles.instructionsText}>{copy.dailySubmission.instruction3}</Text>
         </View>
+
+        <View style={styles.formCard}>
+          <TextInput
+            style={styles.textArea}
+            placeholder={
+              isPastCutoff
+                ? copy.dailySubmission.closedInputPlaceholder
+                : copy.dailySubmission.openInputPlaceholder
+            }
+            placeholderTextColor="#999"
+            value={submissionText}
+            onChangeText={setSubmissionText}
+            multiline
+            numberOfLines={8}
+            editable={!loading && !isPastCutoff}
+          />
+
+          {error ? <Text style={styles.error}>{error}</Text> : null}
+
+          <TouchableOpacity
+            style={[styles.button, (loading || isPastCutoff) && styles.buttonDisabled]}
+            onPress={handleSubmit}
+            disabled={loading || isPastCutoff}
+          >
+            {loading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.buttonText}>
+                {isPastCutoff ? copy.dailySubmission.closedSubmitButton : copy.dailySubmission.submitButton}
+              </Text>
+            )}
+          </TouchableOpacity>
+        </View>
+
+        {/*<View style={styles.scoringCard}>
+          <Text style={styles.scoringTitle}>Scoring System</Text>
+          <View style={styles.scoringRow}>
+            <Text style={styles.scoringText}>1 guess: {config?.pointsGuess1 ?? 20} points</Text>
+            <Text style={styles.scoringText}>2 guesses: {config?.pointsGuess2 ?? 8} points</Text>
+          </View>
+          <View style={styles.scoringRow}>
+            <Text style={styles.scoringText}>3 guesses: {config?.pointsGuess3 ?? 6} points</Text>
+            <Text style={styles.scoringText}>4 guesses: {config?.pointsGuess4 ?? 4} points</Text>
+          </View>
+          <View style={styles.scoringRow}>
+            <Text style={styles.scoringText}>5 guesses: {config?.pointsGuess5 ?? 2} points</Text>
+            <Text style={styles.scoringText}>6 guesses: {config?.pointsGuess6 ?? 1} points</Text>
+          </View>
+          <Text style={styles.scoringText}>
+            No submission: {config?.pointsMissed ?? -2} points
+          </Text>
+        </View>*/}
       </ScrollView>
-    );
-  }
-
-  return (
-    <ScrollView
-      style={styles.container}
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
-      }
-    >
-      <View style={styles.header}>
-        <Text style={styles.title}>Daily Word Game Submission</Text>
-        <Text style={styles.timer}>{timeUntilCutoff}</Text>
-      </View>
-
-      <View style={styles.instructionsCard}>
-        <Text style={styles.instructionsTitle}>How to submit:</Text>
-        <Text style={styles.instructionsText}>1. Play today's Word Game</Text>
-        <Text style={styles.instructionsText}>2. Tap the Share button</Text>
-        <Text style={styles.instructionsText}>3. Paste the complete result below</Text>
-      </View>
-
-      <View style={styles.formCard}>
-        <TextInput
-          style={styles.textArea}
-          placeholder={isPastCutoff ? "Submission window closed" : "Paste your Word Game result here..."}
-          placeholderTextColor="#999"
-          value={submissionText}
-          onChangeText={setSubmissionText}
-          multiline
-          numberOfLines={8}
-          editable={!loading && !isPastCutoff}
-        />
-
-        {error ? <Text style={styles.error}>{error}</Text> : null}
-
-        <TouchableOpacity
-          style={[styles.button, (loading || isPastCutoff) && styles.buttonDisabled]}
-          onPress={handleSubmit}
-          disabled={loading || isPastCutoff}
-        >
-          {loading ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.buttonText}>
-              {isPastCutoff ? 'Submission Closed' : 'Submit'}
-            </Text>
-          )}
-        </TouchableOpacity>
-      </View>
-
-      {/*<View style={styles.scoringCard}>
-        <Text style={styles.scoringTitle}>Scoring System</Text>
-        <View style={styles.scoringRow}>
-          <Text style={styles.scoringText}>1 guess: {config?.pointsGuess1 ?? 20} points</Text>
-          <Text style={styles.scoringText}>2 guesses: {config?.pointsGuess2 ?? 8} points</Text>
-        </View>
-        <View style={styles.scoringRow}>
-          <Text style={styles.scoringText}>3 guesses: {config?.pointsGuess3 ?? 6} points</Text>
-          <Text style={styles.scoringText}>4 guesses: {config?.pointsGuess4 ?? 4} points</Text>
-        </View>
-        <View style={styles.scoringRow}>
-          <Text style={styles.scoringText}>5 guesses: {config?.pointsGuess5 ?? 2} points</Text>
-          <Text style={styles.scoringText}>6 guesses: {config?.pointsGuess6 ?? 1} points</Text>
-        </View>
-        <Text style={styles.scoringText}>
-          No submission: {config?.pointsMissed ?? -2} points
-        </Text>
-      </View>*/}
-    </ScrollView>
+    </>
   );
 }
 
 const styles = StyleSheet.create({
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.45)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalCard: {
+    width: '100%',
+    maxWidth: 420,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 20,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1a1a1a',
+    marginBottom: 12,
+  },
+  modalBodyTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1a1a1a',
+    marginTop: 8,
+    marginBottom: 6,
+  },
+  modalBodyText: {
+    fontSize: 14,
+    color: '#4b5563',
+    marginBottom: 4,
+  },
+  modalButton: {
+    marginTop: 16,
+    backgroundColor: '#10b981',
+    borderRadius: 8,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  modalButtonText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '600',
+  },
   container: {
     flex: 1,
     backgroundColor: '#f5f5f5',

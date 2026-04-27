@@ -3,8 +3,7 @@ import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator,
 import { router } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { AppleSignInButton } from '@/components/AppleSignInButton';
-import * as AppleAuthentication from 'expo-apple-authentication';
-import { supabase } from '@/lib/supabase';
+import { copy } from '@/app/copy/strings';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
@@ -15,7 +14,7 @@ export default function LoginScreen() {
 
   const handleLogin = async () => {
     if (!email || !password) {
-      setError('Please fill in all fields');
+      setError(copy.auth.login.fillAllFieldsError);
       return;
     }
 
@@ -40,15 +39,15 @@ export default function LoginScreen() {
       style={styles.container}
     >
       <View style={styles.content}>
-        <Text style={styles.title}>Word Tournaments</Text>
-        <Text style={styles.subtitle}>Track your daily Word scores</Text>
+        <Text style={styles.title}>{copy.auth.login.title}</Text>
+        <Text style={styles.subtitle}>{copy.auth.login.subtitle}</Text>
 
         <AppleSignInButton />
 
         <View style={styles.form}>
           <TextInput
             style={styles.input}
-            placeholder="Email"
+            placeholder={copy.auth.login.emailPlaceholder}
             placeholderTextColor="#999"
             value={email}
             onChangeText={setEmail}
@@ -60,7 +59,7 @@ export default function LoginScreen() {
 
           <TextInput
             style={styles.input}
-            placeholder="Password"
+            placeholder={copy.auth.login.passwordPlaceholder}
             placeholderTextColor="#999"
             value={password}
             onChangeText={setPassword}
@@ -80,25 +79,25 @@ export default function LoginScreen() {
             {loading ? (
               <ActivityIndicator color="#fff" />
             ) : (
-              <Text style={styles.buttonText}>Sign In</Text>
+              <Text style={styles.buttonText}>{copy.auth.login.signInButton}</Text>
             )}
           </TouchableOpacity>
 
-          <TouchableOpacity
+          {/*<TouchableOpacity
             onPress={() => router.push('/(auth)/forgot-password')}
             disabled={loading}
           >
             <Text style={styles.linkText}>
-              <Text style={styles.linkTextBold}>Forgot password?</Text>
+              <Text style={styles.linkTextBold}>{copy.auth.login.forgotPassword}</Text>
             </Text>
-          </TouchableOpacity>
+          </TouchableOpacity>*/}
 
           <TouchableOpacity
             onPress={() => router.push('/(auth)/signup')}
             disabled={loading}
           >
             <Text style={styles.linkText}>
-              Don't have an account? <Text style={styles.linkTextBold}>Sign Up</Text>
+              {copy.auth.login.noAccountPrefix} <Text style={styles.linkTextBold}>{copy.auth.login.signUpCta}</Text>
             </Text>
           </TouchableOpacity>
         </View>
