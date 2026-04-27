@@ -323,6 +323,17 @@ export default function DraftTournamentScreen() {
   const canStart = participants.length >= 2;
   const isCreator = user?.id != null && tournament.created_by === user.id;
 
+  const joinCodeSection = (
+    <View style={styles.joinCodeRow}>
+      <Text style={styles.joinCodeLabel}>Join code </Text>
+      <Text style={styles.joinCodeValue}>{tournament.join_code}</Text>
+      <TouchableOpacity onPress={handleCopyCode} style={styles.copyButton}>
+        <Copy size={18} color="#10b981" />
+        <Text style={styles.copyButtonText}>Copy</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
   const handleBack = () => {
     if (source === 'manage-drafts') {
       router.replace({
@@ -379,6 +390,7 @@ export default function DraftTournamentScreen() {
               {formatTournamentLengthLabel(tournament.start_date, tournament.end_date)}
             </Text>
           </View>
+          {joinCodeSection}
           <View style={styles.participantsSection}>
             <View style={styles.participantsHeader}>
               <Users size={24} color="#1a1a1a" />
@@ -449,14 +461,7 @@ export default function DraftTournamentScreen() {
           </Text>
         </View>
 
-        <View style={styles.joinCodeRow}>
-          <Text style={styles.joinCodeLabel}>Join code </Text>
-          <Text style={styles.joinCodeValue}>{tournament.join_code}</Text>
-          <TouchableOpacity onPress={handleCopyCode} style={styles.copyButton}>
-            <Copy size={18} color="#10b981" />
-            <Text style={styles.copyButtonText}>Copy</Text>
-          </TouchableOpacity>
-        </View>
+        {joinCodeSection}
 
         <View style={styles.participantsSection}>
           <View style={styles.participantsHeader}>
