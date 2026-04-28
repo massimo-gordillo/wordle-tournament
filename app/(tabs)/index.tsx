@@ -18,6 +18,7 @@ import { getTodayDateEST, getTimeUntilCutoff } from '@/lib/dateUtils';
 import { useAppConfig } from '@/contexts/ConfigContext';
 import { DailySubmissionCard } from '@/components/DailySubmissionCard';
 import { devLog } from '@/utils/logger';
+import { withTimeout } from '@/lib/requestTimeout';
 
 interface Submission {
   submission_text: string;
@@ -26,6 +27,7 @@ interface Submission {
 }
 
 const NO_SUBMISSION_PENALTY_LABEL = 'NO SUBMISSION - PENALTY';
+const TODAY_SUBMISSION_TIMEOUT_MS = 12000;
 
 /** Placeholder for tournament_chat.message when message_type is result (grid lives on daily_submissions). */
 const RESULT_CHAT_PLACEHOLDER_MESSAGE = 'result';
@@ -44,6 +46,7 @@ export default function DailySubmissionScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [showIntroModal, setShowIntroModal] = useState(false);
   const [initialSubmissionLoadComplete, setInitialSubmissionLoadComplete] = useState(false);
+  const [loadError, setLoadError] = useState('');
 
   const dismissIntroModal = useCallback(() => {
     setShowIntroModal(false);
@@ -52,16 +55,26 @@ export default function DailySubmissionScreen() {
 
   const loadTodaySubmission = useCallback(async () => {
     if (!user) return;
+    setLoadError('');
     try {
       const today = getTodayDateEST();
-      const { data, error } = await supabase
-        .from('daily_submissions')
-        .select('submission_text, wordle_score, submitted_at')
-        .eq('user_id', user.id)
-        .eq('submission_date', today)
-        .maybeSingle();
+      const { data, error } = await withTimeout(
+        supabase
+          .from('daily_submissions')
+          .select('submission_text, wordle_score, submitted_at')
+          .eq('user_id', user.id)
+          .eq('submission_date', today)
+          .maybeSingle(),
+        TODAY_SUBMISSION_TIMEOUT_MS,
+        'Loading today\'s submission timed out',
+      );
 
-      if (error || !data) {
+      if (error) {
+        setLoadError('Could not load your submission right now. Please try again.');
+        setTodaySubmission(null);
+        return;
+      }
+      if (!data) {
         setTodaySubmission(null);
         return;
       }
@@ -70,21 +83,40 @@ export default function DailySubmissionScreen() {
         return;
       }
       setTodaySubmission(data);
+    } catch (err) {
+      devLog('loadTodaySubmission failed', err);
+      setLoadError('Unable to reach the server. Please try again.');
+      setTodaySubmission(null);
     } finally {
       setInitialSubmissionLoadComplete(true);
     }
   }, [user]);
 
+  const updateCountdown = useCallback(() => {
+    const cutoffHour = config?.cutoffHourEst ?? 23;
+    const { hours, minutes, isPastCutoff: pastCutoff } = getTimeUntilCutoff(cutoffHour);
+
+    if (pastCutoff) {
+      setIsPastCutoff(true);
+      setTimeUntilCutoff('Submission window closed, opens tomorrow at 12:01AM EST');
+      return;
+    }
+
+    setTimeUntilCutoff(`${hours}h ${minutes}m until cutoff`);
+    setIsPastCutoff(false);
+  }, [config?.cutoffHourEst]);
+
   useEffect(() => {
     updateCountdown();
     const interval = setInterval(updateCountdown, 1000);
     return () => clearInterval(interval);
-  }, []);
+  }, [updateCountdown]);
 
   useEffect(() => {
     if (!user) {
       setTodaySubmission(null);
       setInitialSubmissionLoadComplete(true);
+      setLoadError('');
       return;
     }
     setTodaySubmission(null);
@@ -113,20 +145,6 @@ export default function DailySubmissionScreen() {
       cancelled = true;
     };
   }, [showIntro, router]);
-
-  const updateCountdown = () => {
-    const cutoffHour = config?.cutoffHourEst ?? 23;
-    const { hours, minutes, isPastCutoff: pastCutoff } = getTimeUntilCutoff(cutoffHour);
-
-    if (pastCutoff) {
-      setIsPastCutoff(true);
-      setTimeUntilCutoff('Submission window closed, opens tomorrow at 12:01AM EST');
-      return;
-    }
-
-    setTimeUntilCutoff(`${hours}h ${minutes}m until cutoff`);
-    setIsPastCutoff(false);
-  };
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -424,6 +442,11 @@ export default function DailySubmissionScreen() {
             <Text style={styles.title}>Today's Submission</Text>
             <Text style={styles.timer}>{timeUntilCutoff}</Text>
           </View>
+          {loadError ? (
+            <View style={styles.loadErrorCard}>
+              <Text style={styles.error}>{loadError}</Text>
+            </View>
+          ) : null}
 
           <DailySubmissionCard
             dateLabel="Today"
@@ -467,6 +490,20 @@ export default function DailySubmissionScreen() {
         </View>
 
         <View style={styles.formCard}>
+          {loadError ? (
+            <View style={styles.loadErrorCard}>
+              <Text style={styles.error}>{loadError}</Text>
+              <TouchableOpacity
+                style={styles.retryButton}
+                onPress={() => {
+                  setInitialSubmissionLoadComplete(false);
+                  void loadTodaySubmission();
+                }}
+              >
+                <Text style={styles.retryButtonText}>Try Again</Text>
+              </TouchableOpacity>
+            </View>
+          ) : null}
           <TextInput
             style={styles.textArea}
             placeholder={isPastCutoff ? "Submission window closed" : "Paste your Word Game result here..."}
@@ -655,6 +692,27 @@ const styles = StyleSheet.create({
     color: '#ef4444',
     fontSize: 14,
     marginTop: 8,
+  },
+  loadErrorCard: {
+    backgroundColor: '#fef2f2',
+    borderWidth: 1,
+    borderColor: '#fecaca',
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 12,
+  },
+  retryButton: {
+    marginTop: 8,
+    alignSelf: 'flex-start',
+    backgroundColor: '#ef4444',
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+  retryButtonText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '600',
   },
   scoringCard: {
     backgroundColor: '#fff',

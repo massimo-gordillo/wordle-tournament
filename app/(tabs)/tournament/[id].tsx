@@ -30,8 +30,10 @@ import {
   type TournamentChatMessage,
 } from '@/components/TournamentChatSection';
 import { devLog } from '@/utils/logger';
+import { withTimeout } from '@/lib/requestTimeout';
 
 const NO_SUBMISSION_PENALTY_LABEL = 'NO SUBMISSION - PENALTY';
+const TOURNAMENT_REQUEST_TIMEOUT_MS = 15000;
 
 interface Tournament {
   id: string;
@@ -81,6 +83,7 @@ export default function TournamentDetailScreen() {
   const [tournamentInfoCollapsed, setTournamentInfoCollapsed] = useState(true);
   const [winnerUserIds, setWinnerUserIds] = useState<Set<string>>(new Set());
   const [showFanfare, setShowFanfare] = useState(false);
+  const [loadError, setLoadError] = useState('');
   const confettiValues = useRef(
     Array.from({ length: FANFARE_PIECES }, () => new Animated.Value(0)),
   ).current;
@@ -89,26 +92,13 @@ export default function TournamentDetailScreen() {
   const celebratedTournamentIdRef = useRef<string | null>(null);
   const confettiDropDistance = Platform.OS === 'web' ? 320 : 420;
 
-  useFocusEffect(
-    useCallback(() => {
-      celebratedTournamentIdRef.current = null;
-      setShowFanfare(false);
-      fanfareOpacity.setValue(0);
-      fanfareScale.setValue(0.8);
-      confettiValues.forEach(v => v.setValue(0));
-      setAllSubmissionsCollapsed(false);
-      setTournamentInfoCollapsed(true);
-      loadTournamentData();
-    }, [confettiValues, fanfareOpacity, fanfareScale, id])
-  );
-
-
-  const loadTournamentData = async (options?: { soft?: boolean }) => {
+  const loadTournamentData = useCallback(async (options?: { soft?: boolean }) => {
     if (!id) return;
 
     const soft = options?.soft ?? false;
     if (!soft) {
       setLoading(true);
+      setLoadError('');
       setTournament(null);
       setScores([]);
       setTodaySubmissions([]);
@@ -120,13 +110,18 @@ export default function TournamentDetailScreen() {
     }
 
     try {
-      const { data: tournamentData, error: tournamentError } = await supabase
-        .from('tournaments')
-        .select('*')
-        .eq('id', id)
-        .single();
+      const { data: tournamentData, error: tournamentError } = await withTimeout(
+        supabase
+          .from('tournaments')
+          .select('*')
+          .eq('id', id)
+          .single(),
+        TOURNAMENT_REQUEST_TIMEOUT_MS,
+        'Loading tournament timed out',
+      );
 
       if (tournamentError || !tournamentData) {
+        setLoadError('Could not load this tournament. Please try again.');
         return;
       }
 
@@ -140,28 +135,40 @@ export default function TournamentDetailScreen() {
       setTournament(tournamentData);
 
       if (tournamentData.status === 'closed') {
-        const { data: winnersData } = await supabase
-          .from('tournament_winners')
-          .select('user_id')
-          .eq('tournament_id', id);
+        const { data: winnersData } = await withTimeout(
+          supabase
+            .from('tournament_winners')
+            .select('user_id')
+            .eq('tournament_id', id),
+          TOURNAMENT_REQUEST_TIMEOUT_MS,
+          'Loading winners timed out',
+        );
 
         setWinnerUserIds(new Set((winnersData ?? []).map(w => w.user_id)));
       } else {
         setWinnerUserIds(new Set());
       }
 
-      const { data: allParticipants } = await supabase
-        .from('tournament_participants')
-        .select('user_id, forfeited, forfeited_at_date')
-        .eq('tournament_id', id);
+      const { data: allParticipants } = await withTimeout(
+        supabase
+          .from('tournament_participants')
+          .select('user_id, forfeited, forfeited_at_date')
+          .eq('tournament_id', id),
+        TOURNAMENT_REQUEST_TIMEOUT_MS,
+        'Loading participants timed out',
+      );
 
       if (allParticipants) {
       const participantIds = allParticipants.map(p => p.user_id);
 
-      const { data: usersData } = await supabase
-        .from('users')
-        .select('id, display_name')
-        .in('id', participantIds);
+      const { data: usersData } = await withTimeout(
+        supabase
+          .from('users')
+          .select('id, display_name')
+          .in('id', participantIds),
+        TOURNAMENT_REQUEST_TIMEOUT_MS,
+        'Loading user profiles timed out',
+      );
 
       const usersMap = new Map(usersData?.map(u => [u.id, u.display_name]));
       const forfeitedMap = new Map(allParticipants.map(p => [p.user_id, p.forfeited]));
@@ -176,12 +183,16 @@ export default function TournamentDetailScreen() {
       setParticipants(participantDetails);
 
       // All submissions for this tournament window
-      const { data: allSubmissionsData } = await supabase
-        .from('daily_submissions')
-        .select('user_id, submission_text, wordle_score, submission_date')
-        .in('user_id', participantIds)
-        .gte('submission_date', tournamentData.start_date)
-        .lte('submission_date', tournamentData.end_date);
+      const { data: allSubmissionsData } = await withTimeout(
+        supabase
+          .from('daily_submissions')
+          .select('user_id, submission_text, wordle_score, submission_date')
+          .in('user_id', participantIds)
+          .gte('submission_date', tournamentData.start_date)
+          .lte('submission_date', tournamentData.end_date),
+        TOURNAMENT_REQUEST_TIMEOUT_MS,
+        'Loading submissions timed out',
+      );
 
       const allSubmissionsWithNames: Submission[] =
         allSubmissionsData?.map(s => ({
@@ -295,13 +306,17 @@ export default function TournamentDetailScreen() {
       setScores(formattedScores);
     }
 
-      const { data: chatData, error: chatErr } = await supabase
-        .from('tournament_chat')
-        .select(
-          'id, user_id, message, message_type, submission_date, created_at, daily_submission_id, users(display_name), daily_submissions!tournament_chat_daily_submission_id_fkey(submission_text, wordle_score)',
-        )
-        .eq('tournament_id', id)
-        .order('created_at', { ascending: true });
+      const { data: chatData, error: chatErr } = await withTimeout(
+        supabase
+          .from('tournament_chat')
+          .select(
+            'id, user_id, message, message_type, submission_date, created_at, daily_submission_id, users(display_name), daily_submissions!tournament_chat_daily_submission_id_fkey(submission_text, wordle_score)',
+          )
+          .eq('tournament_id', id)
+          .order('created_at', { ascending: true }),
+        TOURNAMENT_REQUEST_TIMEOUT_MS,
+        'Loading chat timed out',
+      );
 
       if (chatErr) {
         devLog('tournament chat load failed', chatErr);
@@ -336,10 +351,26 @@ export default function TournamentDetailScreen() {
           }),
         );
       }
+    } catch (err) {
+      devLog('loadTournamentData failed', err);
+      setLoadError('Unable to reach the server. Please try again.');
     } finally {
       setLoading(false);
     }
-  };
+  }, [config?.cutoffHourEst, id, source]);
+
+  useFocusEffect(
+    useCallback(() => {
+      celebratedTournamentIdRef.current = null;
+      setShowFanfare(false);
+      fanfareOpacity.setValue(0);
+      fanfareScale.setValue(0.8);
+      confettiValues.forEach(v => v.setValue(0));
+      setAllSubmissionsCollapsed(false);
+      setTournamentInfoCollapsed(true);
+      void loadTournamentData();
+    }, [confettiValues, fanfareOpacity, fanfareScale, loadTournamentData])
+  );
 
   useEffect(() => {
     const isWinner =
@@ -417,7 +448,10 @@ export default function TournamentDetailScreen() {
   if (!tournament) {
     return (
       <View style={styles.loadingContainer}>
-        <Text>Tournament not found</Text>
+        <Text>{loadError || 'Tournament not found'}</Text>
+        <TouchableOpacity style={styles.retryLoadButton} onPress={() => void loadTournamentData()}>
+          <Text style={styles.retryLoadButtonText}>Try Again</Text>
+        </TouchableOpacity>
       </View>
     );
   }
@@ -461,9 +495,13 @@ export default function TournamentDetailScreen() {
     if (!user || !id) return;
     try {
       setForfeitLoading(true);
-      const { error } = await supabase.rpc('forfeit_tournament', {
-        p_tournament_id: id,
-      });
+      const { error } = await withTimeout(
+        supabase.rpc('forfeit_tournament', {
+          p_tournament_id: id,
+        }),
+        TOURNAMENT_REQUEST_TIMEOUT_MS,
+        'Forfeit request timed out',
+      );
 
       if (error) {
         if (error.message?.includes('ALREADY_FORFEITED') || error.message?.toLowerCase().includes('already forfeited')) {
@@ -505,12 +543,16 @@ export default function TournamentDetailScreen() {
     if (!user || !id) return;
     setChatSending(true);
     try {
-      const { error } = await supabase.from('tournament_chat').insert({
-        tournament_id: id as string,
-        user_id: user.id,
-        message: text,
-        message_type: 'chat',
-      });
+      const { error } = await withTimeout(
+        supabase.from('tournament_chat').insert({
+          tournament_id: id as string,
+          user_id: user.id,
+          message: text,
+          message_type: 'chat',
+        }),
+        TOURNAMENT_REQUEST_TIMEOUT_MS,
+        'Sending message timed out',
+      );
       if (error) {
         devLog('send chat failed', error);
         return;
@@ -907,6 +949,17 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  retryLoadButton: {
+    marginTop: 12,
+    backgroundColor: '#10b981',
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+  },
+  retryLoadButtonText: {
+    color: '#fff',
+    fontWeight: '600',
   },
   header: {
     backgroundColor: '#10b981',
