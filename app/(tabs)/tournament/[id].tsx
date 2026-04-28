@@ -103,16 +103,33 @@ export default function TournamentDetailScreen() {
   );
 
 
-  const loadTournamentData = async () => {
+  const loadTournamentData = async (options?: { soft?: boolean }) => {
     if (!id) return;
 
-    const { data: tournamentData } = await supabase
-      .from('tournaments')
-      .select('*')
-      .eq('id', id)
-      .single();
+    const soft = options?.soft ?? false;
+    if (!soft) {
+      setLoading(true);
+      setTournament(null);
+      setScores([]);
+      setTodaySubmissions([]);
+      setAllSubmissions([]);
+      setParticipants([]);
+      setResultsReady(false);
+      setChatMessages([]);
+      setWinnerUserIds(new Set());
+    }
 
-    if (tournamentData) {
+    try {
+      const { data: tournamentData, error: tournamentError } = await supabase
+        .from('tournaments')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      if (tournamentError || !tournamentData) {
+        return;
+      }
+
       if (tournamentData.status === 'draft') {
         router.replace({
           pathname: '/draft-tournament/[id]',
@@ -132,14 +149,13 @@ export default function TournamentDetailScreen() {
       } else {
         setWinnerUserIds(new Set());
       }
-    }
 
-    const { data: allParticipants } = await supabase
-      .from('tournament_participants')
-      .select('user_id, forfeited, forfeited_at_date')
-      .eq('tournament_id', id);
+      const { data: allParticipants } = await supabase
+        .from('tournament_participants')
+        .select('user_id, forfeited, forfeited_at_date')
+        .eq('tournament_id', id);
 
-    if (allParticipants) {
+      if (allParticipants) {
       const participantIds = allParticipants.map(p => p.user_id);
 
       const { data: usersData } = await supabase
@@ -279,7 +295,6 @@ export default function TournamentDetailScreen() {
       setScores(formattedScores);
     }
 
-    if (tournamentData && tournamentData.status !== 'draft') {
       const { data: chatData, error: chatErr } = await supabase
         .from('tournament_chat')
         .select(
@@ -321,11 +336,9 @@ export default function TournamentDetailScreen() {
           }),
         );
       }
-    } else {
-      setChatMessages([]);
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   };
 
   useEffect(() => {
@@ -461,7 +474,7 @@ export default function TournamentDetailScreen() {
         return;
       }
 
-      await loadTournamentData();
+      await loadTournamentData({ soft: true });
     } finally {
       setForfeitLoading(false);
     }
@@ -502,7 +515,7 @@ export default function TournamentDetailScreen() {
         devLog('send chat failed', error);
         return;
       }
-      await loadTournamentData();
+      await loadTournamentData({ soft: true });
     } finally {
       setChatSending(false);
     }
@@ -601,7 +614,7 @@ export default function TournamentDetailScreen() {
             refreshing={refreshing}
             onRefresh={async () => {
               setRefreshing(true);
-              await loadTournamentData();
+              await loadTournamentData({ soft: true });
               setRefreshing(false);
             }}
           />

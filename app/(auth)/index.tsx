@@ -84,6 +84,7 @@ export default function LoginScreen() {
             )}
           </TouchableOpacity>
 
+          {/* Forgot password — re-enable when email reset is configured
           <TouchableOpacity
             onPress={() => router.push('/(auth)/forgot-password')}
             disabled={loading}
@@ -92,6 +93,7 @@ export default function LoginScreen() {
               <Text style={styles.linkTextBold}>Forgot password?</Text>
             </Text>
           </TouchableOpacity>
+          */}
 
           <TouchableOpacity
             onPress={() => router.push('/(auth)/signup')}

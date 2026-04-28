@@ -12,6 +12,7 @@ import {
 import { router } from 'expo-router';
 import * as Linking from 'expo-linking';
 import { supabase } from '@/lib/supabase';
+import { markPendingSignupIntro } from '@/lib/pendingSignupIntro';
 
 export default function SignupScreen() {
   const MIN_DISPLAY_NAME_LENGTH = 4;
@@ -70,6 +71,8 @@ export default function SignupScreen() {
       return;
     }
 
+    await markPendingSignupIntro();
+
     if (!data.user) {
       setLoading(false);
       router.replace({
@@ -82,7 +85,10 @@ export default function SignupScreen() {
     setLoading(false);
 
     if (data.session) {
-      router.replace('/(tabs)');
+      router.replace({
+        pathname: '/(tabs)',
+        params: { showIntro: '1' },
+      });
       return;
     }
 

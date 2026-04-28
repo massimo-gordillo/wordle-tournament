@@ -1,7 +1,19 @@
-import { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, RefreshControl } from 'react-native';
+import { useState, useEffect, useLayoutEffect, useCallback } from 'react';
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  ScrollView,
+  ActivityIndicator,
+  RefreshControl,
+  Modal,
+} from 'react-native';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
+import { clearPendingSignupIntro, getPendingSignupIntro } from '@/lib/pendingSignupIntro';
 import { getTodayDateEST, getTimeUntilCutoff } from '@/lib/dateUtils';
 import { useAppConfig } from '@/contexts/ConfigContext';
 import { DailySubmissionCard } from '@/components/DailySubmissionCard';
@@ -21,6 +33,8 @@ const RESULT_CHAT_PLACEHOLDER_MESSAGE = 'result';
 export default function DailySubmissionScreen() {
   const { user } = useAuth();
   const { config } = useAppConfig();
+  const router = useRouter();
+  const { showIntro } = useLocalSearchParams<{ showIntro?: string }>();
   const [submissionText, setSubmissionText] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -28,13 +42,77 @@ export default function DailySubmissionScreen() {
   const [timeUntilCutoff, setTimeUntilCutoff] = useState('');
   const [isPastCutoff, setIsPastCutoff] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [showIntroModal, setShowIntroModal] = useState(false);
+  const [initialSubmissionLoadComplete, setInitialSubmissionLoadComplete] = useState(false);
+
+  const dismissIntroModal = useCallback(() => {
+    setShowIntroModal(false);
+    void clearPendingSignupIntro();
+  }, []);
+
+  const loadTodaySubmission = useCallback(async () => {
+    if (!user) return;
+    try {
+      const today = getTodayDateEST();
+      const { data, error } = await supabase
+        .from('daily_submissions')
+        .select('submission_text, wordle_score, submitted_at')
+        .eq('user_id', user.id)
+        .eq('submission_date', today)
+        .maybeSingle();
+
+      if (error || !data) {
+        setTodaySubmission(null);
+        return;
+      }
+      if (data.submission_text === NO_SUBMISSION_PENALTY_LABEL) {
+        setTodaySubmission(null);
+        return;
+      }
+      setTodaySubmission(data);
+    } finally {
+      setInitialSubmissionLoadComplete(true);
+    }
+  }, [user]);
 
   useEffect(() => {
-    loadTodaySubmission();
     updateCountdown();
     const interval = setInterval(updateCountdown, 1000);
     return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    if (!user) {
+      setTodaySubmission(null);
+      setInitialSubmissionLoadComplete(true);
+      return;
+    }
+    setTodaySubmission(null);
+    setInitialSubmissionLoadComplete(false);
+    void loadTodaySubmission();
+  }, [user, loadTodaySubmission]);
+
+  // Route param + AsyncStorage flag (Android/iOS/web). Clear storage only on dismiss.
+  useLayoutEffect(() => {
+    const fromParam = showIntro === '1';
+    if (fromParam) {
+      setShowIntroModal(true);
+      router.replace('/(tabs)');
+    }
+
+    let cancelled = false;
+    void (async () => {
+      const fromStorage = await getPendingSignupIntro();
+      if (cancelled) return;
+      if (fromStorage) {
+        setShowIntroModal(true);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [showIntro, router]);
 
   const updateCountdown = () => {
     const cutoffHour = config?.cutoffHourEst ?? 23;
@@ -54,28 +132,6 @@ export default function DailySubmissionScreen() {
     setRefreshing(true);
     await loadTodaySubmission();
     setRefreshing(false);
-  };
-
-  const loadTodaySubmission = async () => {
-    if (!user) return;
-
-    const today = getTodayDateEST();
-    const { data, error } = await supabase
-      .from('daily_submissions')
-      .select('submission_text, wordle_score, submitted_at')
-      .eq('user_id', user.id)
-      .eq('submission_date', today)
-      .maybeSingle();
-
-    if (!error && data) {
-      // If the cron inserted a "no submission" penalty row at cutoff, don't render it
-      // as a Wordle grid submission.
-      if (data.submission_text === NO_SUBMISSION_PENALTY_LABEL) {
-        setTodaySubmission(null);
-        return;
-      }
-      setTodaySubmission(data);
-    }
   };
 
   const parseWordle = (text: string) => {
@@ -314,8 +370,84 @@ export default function DailySubmissionScreen() {
     }
   };
 
+  const introModal = (
+    <Modal
+      visible={showIntroModal}
+      transparent
+      animationType="fade"
+      onRequestClose={dismissIntroModal}
+    >
+      <View style={styles.modalBackdrop}>
+        <View style={styles.modalCard}>
+          <Text style={styles.modalTitle}>Welcome</Text>
+
+          <Text style={styles.modalBodyTitle}>How to submit your score</Text>
+          <Text style={styles.modalBodyText}>{"1. Play today's Word Game"}</Text>
+          <Text style={styles.modalBodyText}>2. Tap Share in Wordle</Text>
+          <Text style={styles.modalBodyText}>3. Paste the full result on this screen</Text>
+
+          <Text style={styles.modalBodyTitle}>How to create or join a tournament</Text>
+          <Text style={styles.modalBodyText}>1. Open the Manage tab</Text>
+          <Text style={styles.modalBodyText}>2. Create a tournament or enter a join code</Text>
+          <Text style={styles.modalBodyText}>3. Submit daily scores to compete automatically</Text>
+
+          <TouchableOpacity style={styles.modalButton} onPress={dismissIntroModal}>
+            <Text style={styles.modalButtonText}>Got it</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
+
+  if (!initialSubmissionLoadComplete) {
+    return (
+      <>
+        {introModal}
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#10b981" />
+        </View>
+      </>
+    );
+  }
+
   if (todaySubmission) {
     return (
+      <>
+        {introModal}
+        <ScrollView
+          style={styles.container}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+          }
+        >
+          <View style={styles.header}>
+            <Text style={styles.title}>Today's Submission</Text>
+            <Text style={styles.timer}>{timeUntilCutoff}</Text>
+          </View>
+
+          <DailySubmissionCard
+            dateLabel="Today"
+            didSubmit
+            score={todaySubmission.wordle_score}
+            submissionText={todaySubmission.submission_text}
+          />
+
+          <View style={styles.infoCard}>
+            <Text style={styles.infoText}>
+              Your score has been applied to all active tournaments you're participating in.
+            </Text>
+            <Text style={styles.infoText}>
+              Come back tomorrow for your next submission!
+            </Text>
+          </View>
+        </ScrollView>
+      </>
+    );
+  }
+
+  return (
+    <>
+      {introModal}
       <ScrollView
         style={styles.container}
         refreshControl={
@@ -323,100 +455,120 @@ export default function DailySubmissionScreen() {
         }
       >
         <View style={styles.header}>
-          <Text style={styles.title}>Today's Submission</Text>
+          <Text style={styles.title}>Daily Word Game Submission</Text>
           <Text style={styles.timer}>{timeUntilCutoff}</Text>
         </View>
 
-        <DailySubmissionCard
-          dateLabel="Today"
-          didSubmit
-          score={todaySubmission.wordle_score}
-          submissionText={todaySubmission.submission_text}
-        />
-
-        <View style={styles.infoCard}>
-          <Text style={styles.infoText}>
-            Your score has been applied to all active tournaments you're participating in.
-          </Text>
-          <Text style={styles.infoText}>
-            Come back tomorrow for your next submission!
-          </Text>
+        <View style={styles.instructionsCard}>
+          <Text style={styles.instructionsTitle}>How to submit:</Text>
+          <Text style={styles.instructionsText}>1. Play today's Word Game</Text>
+          <Text style={styles.instructionsText}>2. Tap the Share button</Text>
+          <Text style={styles.instructionsText}>3. Paste the complete result below</Text>
         </View>
+
+        <View style={styles.formCard}>
+          <TextInput
+            style={styles.textArea}
+            placeholder={isPastCutoff ? "Submission window closed" : "Paste your Word Game result here..."}
+            placeholderTextColor="#999"
+            value={submissionText}
+            onChangeText={setSubmissionText}
+            multiline
+            numberOfLines={8}
+            editable={!loading && !isPastCutoff}
+          />
+
+          {error ? <Text style={styles.error}>{error}</Text> : null}
+
+          <TouchableOpacity
+            style={[styles.button, (loading || isPastCutoff) && styles.buttonDisabled]}
+            onPress={handleSubmit}
+            disabled={loading || isPastCutoff}
+          >
+            {loading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.buttonText}>
+                {isPastCutoff ? 'Submission Closed' : 'Submit'}
+              </Text>
+            )}
+          </TouchableOpacity>
+        </View>
+
+        {/*<View style={styles.scoringCard}>
+          <Text style={styles.scoringTitle}>Scoring System</Text>
+          <View style={styles.scoringRow}>
+            <Text style={styles.scoringText}>1 guess: {config?.pointsGuess1 ?? 20} points</Text>
+            <Text style={styles.scoringText}>2 guesses: {config?.pointsGuess2 ?? 8} points</Text>
+          </View>
+          <View style={styles.scoringRow}>
+            <Text style={styles.scoringText}>3 guesses: {config?.pointsGuess3 ?? 6} points</Text>
+            <Text style={styles.scoringText}>4 guesses: {config?.pointsGuess4 ?? 4} points</Text>
+          </View>
+          <View style={styles.scoringRow}>
+            <Text style={styles.scoringText}>5 guesses: {config?.pointsGuess5 ?? 2} points</Text>
+            <Text style={styles.scoringText}>6 guesses: {config?.pointsGuess6 ?? 1} points</Text>
+          </View>
+          <Text style={styles.scoringText}>
+            No submission: {config?.pointsMissed ?? -2} points
+          </Text>
+        </View>*/}
       </ScrollView>
-    );
-  }
-
-  return (
-    <ScrollView
-      style={styles.container}
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
-      }
-    >
-      <View style={styles.header}>
-        <Text style={styles.title}>Daily Word Game Submission</Text>
-        <Text style={styles.timer}>{timeUntilCutoff}</Text>
-      </View>
-
-      <View style={styles.instructionsCard}>
-        <Text style={styles.instructionsTitle}>How to submit:</Text>
-        <Text style={styles.instructionsText}>1. Play today's Word Game</Text>
-        <Text style={styles.instructionsText}>2. Tap the Share button</Text>
-        <Text style={styles.instructionsText}>3. Paste the complete result below</Text>
-      </View>
-
-      <View style={styles.formCard}>
-        <TextInput
-          style={styles.textArea}
-          placeholder={isPastCutoff ? "Submission window closed" : "Paste your Word Game result here..."}
-          placeholderTextColor="#999"
-          value={submissionText}
-          onChangeText={setSubmissionText}
-          multiline
-          numberOfLines={8}
-          editable={!loading && !isPastCutoff}
-        />
-
-        {error ? <Text style={styles.error}>{error}</Text> : null}
-
-        <TouchableOpacity
-          style={[styles.button, (loading || isPastCutoff) && styles.buttonDisabled]}
-          onPress={handleSubmit}
-          disabled={loading || isPastCutoff}
-        >
-          {loading ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.buttonText}>
-              {isPastCutoff ? 'Submission Closed' : 'Submit'}
-            </Text>
-          )}
-        </TouchableOpacity>
-      </View>
-
-      {/*<View style={styles.scoringCard}>
-        <Text style={styles.scoringTitle}>Scoring System</Text>
-        <View style={styles.scoringRow}>
-          <Text style={styles.scoringText}>1 guess: {config?.pointsGuess1 ?? 20} points</Text>
-          <Text style={styles.scoringText}>2 guesses: {config?.pointsGuess2 ?? 8} points</Text>
-        </View>
-        <View style={styles.scoringRow}>
-          <Text style={styles.scoringText}>3 guesses: {config?.pointsGuess3 ?? 6} points</Text>
-          <Text style={styles.scoringText}>4 guesses: {config?.pointsGuess4 ?? 4} points</Text>
-        </View>
-        <View style={styles.scoringRow}>
-          <Text style={styles.scoringText}>5 guesses: {config?.pointsGuess5 ?? 2} points</Text>
-          <Text style={styles.scoringText}>6 guesses: {config?.pointsGuess6 ?? 1} points</Text>
-        </View>
-        <Text style={styles.scoringText}>
-          No submission: {config?.pointsMissed ?? -2} points
-        </Text>
-      </View>*/}
-    </ScrollView>
+    </>
   );
 }
 
 const styles = StyleSheet.create({
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f5f5f5',
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.45)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalCard: {
+    width: '100%',
+    maxWidth: 420,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 20,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1a1a1a',
+    marginBottom: 12,
+  },
+  modalBodyTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1a1a1a',
+    marginTop: 8,
+    marginBottom: 6,
+  },
+  modalBodyText: {
+    fontSize: 14,
+    color: '#4b5563',
+    marginBottom: 4,
+  },
+  modalButton: {
+    marginTop: 16,
+    backgroundColor: '#10b981',
+    borderRadius: 8,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  modalButtonText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '600',
+  },
   container: {
     flex: 1,
     backgroundColor: '#f5f5f5',
