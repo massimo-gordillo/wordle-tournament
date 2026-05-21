@@ -400,14 +400,19 @@ export default function DailySubmissionScreen() {
           <Text style={styles.modalTitle}>Welcome</Text>
 
           <Text style={styles.modalBodyTitle}>How to submit your score</Text>
-          <Text style={styles.modalBodyText}>{"1. Play today's Word Game"}</Text>
-          <Text style={styles.modalBodyText}>2. Tap Share in Wordle</Text>
-          <Text style={styles.modalBodyText}>3. Paste the full result on this screen</Text>
+          <Text style={styles.modalBodyText}>1. Play today's Word-L Game on the NYT website</Text>
+          <Text style={styles.modalBodyText}>2. Tap the Share button</Text>
+          <Text style={styles.modalBodyText}>3. Open this app and paste the result here</Text>
 
-          <Text style={styles.modalBodyTitle}>How to create or join a tournament</Text>
-          <Text style={styles.modalBodyText}>1. Open the Manage tab</Text>
-          <Text style={styles.modalBodyText}>2. Create a tournament or enter a join code</Text>
-          <Text style={styles.modalBodyText}>3. Submit daily scores to compete automatically</Text>
+          <Text style={styles.modalBodyTitle}>How to create a tournament</Text>
+          <Text style={styles.modalBodyText}>1. Open the Manage tab and create a tournament</Text>
+          <Text style={styles.modalBodyText}>2. Copy the join code and share with your friends</Text>
+          <Text style={styles.modalBodyText}>3. View the tournament in drafts and start it when you're ready</Text>
+
+          <Text style={styles.modalBodyTitle}>How to join a tournament</Text>
+          <Text style={styles.modalBodyText}>1. Ask your friends for the tournament join code</Text>
+          <Text style={styles.modalBodyText}>2. Go to the ongoing tournaments tab and click 'join by code'</Text>
+          <Text style={styles.modalBodyText}>3. Paste the code and click 'join'. Your friend will start the tournament when everyone has joined</Text>
 
           <TouchableOpacity style={styles.modalButton} onPress={dismissIntroModal}>
             <Text style={styles.modalButtonText}>Got it</Text>

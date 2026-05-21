@@ -1,13 +1,16 @@
 import { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, RefreshControl } from 'react-native';
+import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
-import { LogOut, Save } from 'lucide-react-native';
+import { ChevronRight, FileText, LogOut, Save, Scale } from 'lucide-react-native';
+import { AppColors } from '@/constants/colors';
 
 export default function AccountScreen() {
   const MIN_DISPLAY_NAME_LENGTH = 4;
   const MAX_DISPLAY_NAME_LENGTH = 15;
   const { user, signOut } = useAuth();
+  const router = useRouter();
   const [displayName, setDisplayName] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -84,7 +87,7 @@ export default function AccountScreen() {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#10b981" />
+        <ActivityIndicator size="large" color={AppColors.brand.primary} />
       </View>
     );
   }
@@ -117,7 +120,7 @@ export default function AccountScreen() {
               value={displayName}
               onChangeText={setDisplayName}
               placeholder="Your display name"
-              placeholderTextColor="#999"
+              placeholderTextColor={AppColors.text.subtle}
               editable={!saving}
               maxLength={MAX_DISPLAY_NAME_LENGTH}
             />
@@ -131,10 +134,10 @@ export default function AccountScreen() {
               disabled={saving}
             >
               {saving ? (
-                <ActivityIndicator color="#fff" />
+                <ActivityIndicator color={AppColors.text.inverse} />
               ) : (
                 <>
-                  <Save size={20} color="#fff" />
+                  <Save size={20} color={AppColors.text.inverse} />
                   <Text style={styles.buttonText}>Save Changes</Text>
                 </>
               )}
@@ -149,7 +152,7 @@ export default function AccountScreen() {
             style={styles.signOutButton}
             onPress={handleSignOut}
           >
-            <LogOut size={20} color="#ef4444" />
+            <LogOut size={20} color={AppColors.status.error} />
             <Text style={styles.signOutText}>Sign Out</Text>
           </TouchableOpacity>
         </View>
@@ -167,6 +170,30 @@ export default function AccountScreen() {
               <Text style={styles.infoValue}>{user?.id.substring(0, 8)}...</Text>
             </View>
           </View>
+
+          <View style={styles.linkCard}>
+            <TouchableOpacity
+              style={styles.linkRow}
+              onPress={() => router.push('/(tabs)/open-source-licenses')}
+            >
+              <View style={styles.linkRowLeft}>
+                <Scale size={18} color={AppColors.icon.default} />
+                <Text style={styles.linkLabel}>Open Source Licenses</Text>
+              </View>
+              <ChevronRight size={18} color={AppColors.icon.subtle} />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.linkRow}
+              onPress={() => router.push('/(tabs)/privacy-policy')}
+            >
+              <View style={styles.linkRowLeft}>
+                <FileText size={18} color={AppColors.icon.default} />
+                <Text style={styles.linkLabel}>Privacy Policy</Text>
+              </View>
+              <ChevronRight size={18} color={AppColors.icon.subtle} />
+            </TouchableOpacity>
+          </View>
         </View>
       </ScrollView>
     </View>
@@ -176,7 +203,7 @@ export default function AccountScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: AppColors.background.app,
   },
   loadingContainer: {
     flex: 1,
@@ -184,7 +211,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   header: {
-    backgroundColor: '#10b981',
+    backgroundColor: AppColors.brand.primary,
     padding: 24,
     paddingTop: 40,
     paddingBottom: 20,
@@ -193,18 +220,18 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#fff',
+    color: AppColors.text.inverse,
   },
   content: {
     flex: 1,
   },
   profileCard: {
-    backgroundColor: '#fff',
+    backgroundColor: AppColors.background.surface,
     margin: 16,
     padding: 24,
     borderRadius: 12,
     alignItems: 'center',
-    shadowColor: '#000',
+    shadowColor: AppColors.shadow,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
@@ -212,7 +239,7 @@ const styles = StyleSheet.create({
   },
   email: {
     fontSize: 16,
-    color: '#666',
+    color: AppColors.text.muted,
   },
   section: {
     padding: 16,
@@ -220,14 +247,14 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 20,
     fontWeight: '600',
-    color: '#1a1a1a',
+    color: AppColors.text.primary,
     marginBottom: 16,
   },
   formCard: {
-    backgroundColor: '#fff',
+    backgroundColor: AppColors.background.surface,
     padding: 20,
     borderRadius: 12,
-    shadowColor: '#000',
+    shadowColor: AppColors.shadow,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
@@ -235,20 +262,20 @@ const styles = StyleSheet.create({
   },
   inputLabel: {
     fontSize: 14,
-    color: '#666',
+    color: AppColors.text.muted,
     marginBottom: 8,
   },
   input: {
-    backgroundColor: '#f9fafb',
+    backgroundColor: AppColors.background.input,
     borderRadius: 8,
     padding: 12,
     fontSize: 16,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: AppColors.border.default,
     marginBottom: 16,
   },
   button: {
-    backgroundColor: '#10b981',
+    backgroundColor: AppColors.brand.primary,
     borderRadius: 8,
     padding: 14,
     flexDirection: 'row',
@@ -260,22 +287,22 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   buttonText: {
-    color: '#fff',
+    color: AppColors.text.inverse,
     fontSize: 16,
     fontWeight: '600',
   },
   error: {
-    color: '#ef4444',
+    color: AppColors.status.error,
     fontSize: 14,
     marginBottom: 12,
   },
   success: {
-    color: '#10b981',
+    color: AppColors.status.success,
     fontSize: 14,
     marginBottom: 12,
   },
   signOutButton: {
-    backgroundColor: '#fff',
+    backgroundColor: AppColors.background.surface,
     borderRadius: 12,
     padding: 16,
     flexDirection: 'row',
@@ -283,23 +310,23 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
     borderWidth: 1,
-    borderColor: '#fee2e2',
-    shadowColor: '#000',
+    borderColor: AppColors.border.danger,
+    shadowColor: AppColors.shadow,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
   },
   signOutText: {
-    color: '#ef4444',
+    color: AppColors.status.error,
     fontSize: 16,
     fontWeight: '600',
   },
   infoCard: {
-    backgroundColor: '#fff',
+    backgroundColor: AppColors.background.surface,
     borderRadius: 12,
     padding: 16,
-    shadowColor: '#000',
+    shadowColor: AppColors.shadow,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
@@ -311,15 +338,44 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#f3f4f6',
+    borderBottomColor: AppColors.border.subtle,
   },
   infoLabel: {
     fontSize: 14,
-    color: '#666',
+    color: AppColors.text.muted,
   },
   infoValue: {
     fontSize: 14,
-    color: '#1a1a1a',
+    color: AppColors.text.primary,
+    fontWeight: '500',
+  },
+  linkCard: {
+    marginTop: 12,
+    backgroundColor: AppColors.background.surface,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    shadowColor: AppColors.shadow,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  linkRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: AppColors.border.subtle,
+  },
+  linkRowLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  linkLabel: {
+    fontSize: 15,
+    color: AppColors.text.secondary,
     fontWeight: '500',
   },
 });

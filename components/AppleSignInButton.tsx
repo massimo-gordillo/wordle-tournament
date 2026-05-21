@@ -1,6 +1,8 @@
-import { Platform } from 'react-native'
+import { Alert, Platform } from 'react-native'
 import * as AppleAuthentication from 'expo-apple-authentication'
-import { supabase } from '@/lib/supabase'; // adjust path to your client
+import { router } from 'expo-router'
+import { supabase } from '@/lib/supabase'
+import { devLog } from '@/utils/logger'
 
 export function AppleSignInButton() {
   // Apple Sign In is iOS only
@@ -26,6 +28,12 @@ export function AppleSignInButton() {
 
       if (error) throw error
 
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
+      if (sessionError) throw sessionError
+      if (!sessionData.session) {
+        throw new Error('Apple sign-in completed, but no Supabase session was created.')
+      }
+
       // Apple only gives you the full name on the VERY FIRST sign-in.
       // Capture and save it immediately if present.
       const fullName = credential.fullName
@@ -39,13 +47,16 @@ export function AppleSignInButton() {
         })
       }
 
+      router.replace('/(tabs)')
+
     } catch (e: any) {
       if (e.code === 'ERR_REQUEST_CANCELED') {
         // User cancelled — no need to show an error
         return
       }
-      console.error('Apple sign in error:', e)
-      // Show your error UI here
+      const message = e?.message ?? 'Unable to sign in with Apple right now.'
+      devLog('Apple sign in error', e)
+      Alert.alert('Apple Sign-In Failed', message)
     }
   }
 

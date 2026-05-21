@@ -2,6 +2,7 @@ import { Tabs, Redirect, useRouter } from 'expo-router';
 import { Home, Trophy, BarChart3, User, Settings } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { ActivityIndicator, View } from 'react-native';
+import { AppColors } from '@/constants/colors';
 
 export default function TabLayout() {
   const { user, loading } = useAuth();
@@ -10,7 +11,7 @@ export default function TabLayout() {
   if (loading) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" color="#10b981" />
+        <ActivityIndicator size="large" color={AppColors.brand.primary} />
       </View>
     );
   }
@@ -23,12 +24,12 @@ export default function TabLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: '#10b981',
-        tabBarInactiveTintColor: '#9ca3af',
+        tabBarActiveTintColor: AppColors.brand.primary,
+        tabBarInactiveTintColor: AppColors.icon.subtle,
         tabBarStyle: {
-          backgroundColor: '#fff',
+          backgroundColor: AppColors.background.surface,
           borderTopWidth: 1,
-          borderTopColor: '#e5e7eb',
+          borderTopColor: AppColors.border.default,
           paddingTop: 8,
           paddingBottom: 16,
           height: 65,
@@ -87,6 +88,18 @@ export default function TabLayout() {
       />
       <Tabs.Screen
         name="draft-tournament/[id]"
+        options={{
+          href: null,
+        }}
+      />
+      <Tabs.Screen
+        name="open-source-licenses"
+        options={{
+          href: null,
+        }}
+      />
+      <Tabs.Screen
+        name="privacy-policy"
         options={{
           href: null,
         }}
