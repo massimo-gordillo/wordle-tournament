@@ -73,6 +73,17 @@ export default function DraftTournamentScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [leaving, setLeaving] = useState(false);
 
+  const routeToTournamentDetail = useCallback(
+    (tournamentId: string, creatorUserId: string) => {
+      const resolvedSource = user?.id === creatorUserId ? 'manage' : 'tournaments';
+      router.replace({
+        pathname: '/tournament/[id]',
+        params: { id: tournamentId, source: resolvedSource },
+      });
+    },
+    [user?.id],
+  );
+
   const loadParticipants = useCallback(async (tournamentId: string) => {
     const { data: participantData } = await supabase
       .from('tournament_participants')
@@ -120,6 +131,11 @@ export default function DraftTournamentScreen() {
       return;
     }
 
+    if (tournamentData.status !== 'draft') {
+      routeToTournamentDetail(tournamentData.id, tournamentData.created_by);
+      return;
+    }
+
     setTournament(tournamentData);
     await loadParticipants(id);
     setLoading(false);
@@ -150,6 +166,11 @@ export default function DraftTournamentScreen() {
         return;
       }
 
+      if (tournamentData.status !== 'draft') {
+        routeToTournamentDetail(tournamentData.id, tournamentData.created_by);
+        return;
+      }
+
       setTournament(tournamentData);
       await loadParticipants(id);
       if (cancelled) return;
@@ -161,7 +182,7 @@ export default function DraftTournamentScreen() {
     return () => {
       cancelled = true;
     };
-  }, [id, loadParticipants]);
+  }, [id, loadParticipants, routeToTournamentDetail]);
 
   const handleKickParticipant = (participant: Participant) => {
     if (!tournament || participant.user_id === user?.id) return;

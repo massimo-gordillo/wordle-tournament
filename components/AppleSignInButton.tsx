@@ -4,6 +4,13 @@ import { router } from 'expo-router'
 import { supabase } from '@/lib/supabase'
 import { devLog } from '@/utils/logger'
 
+const buildAppleDisplayName = (givenName: string, familyName?: string | null) => {
+  const trimmedGivenName = givenName.trim()
+  const trimmedFamilyName = familyName?.trim()
+  const lastInitial = trimmedFamilyName ? trimmedFamilyName.charAt(0).toUpperCase() : ''
+  return `${trimmedGivenName}${lastInitial ? ` ${lastInitial}` : ''}`
+}
+
 export function AppleSignInButton() {
   // Apple Sign In is iOS only
   if (Platform.OS !== 'ios') return null
@@ -38,13 +45,27 @@ export function AppleSignInButton() {
       // Capture and save it immediately if present.
       const fullName = credential.fullName
       if (fullName?.givenName) {
+        const displayName = buildAppleDisplayName(fullName.givenName, fullName.familyName)
+
         await supabase.auth.updateUser({
           data: {
+            display_name: displayName,
+            full_name: `${fullName.givenName} ${fullName.familyName ?? ''}`.trim(),
+            given_name: fullName.givenName,
+            family_name: fullName.familyName ?? '',
             first_name: fullName.givenName,
             last_name: fullName.familyName ?? '',
-            full_name: `${fullName.givenName} ${fullName.familyName ?? ''}`.trim(),
           },
         })
+
+        const { data: userData } = await supabase.auth.getUser()
+        const userId = userData.user?.id
+        if (userId) {
+          await supabase
+            .from('users')
+            .update({ display_name: displayName })
+            .eq('id', userId)
+        }
       }
 
       router.replace('/(tabs)')
