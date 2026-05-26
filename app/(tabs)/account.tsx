@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, RefreshControl } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, RefreshControl, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
-import { ChevronRight, FileText, LogOut, Save, Scale } from 'lucide-react-native';
+import { ChevronRight, FileText, LogOut, Save, Scale, Trash2 } from 'lucide-react-native';
 import { AppColors } from '@/constants/colors';
 import { copy, fillCopyTemplate } from '@/app/copy/strings';
+import { confirmDestructive } from '@/lib/confirmDestructive';
+import { deleteAccount } from '@/lib/deleteAccount';
 
 export default function AccountScreen() {
   const MIN_DISPLAY_NAME_LENGTH = 4;
@@ -18,6 +20,7 @@ export default function AccountScreen() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [refreshing, setRefreshing] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     loadUserProfile();
@@ -81,6 +84,33 @@ export default function AccountScreen() {
 
   const handleSignOut = async () => {
     await signOut();
+  };
+
+  const runDeleteAccount = async () => {
+    setDeleting(true);
+    setError('');
+
+    const { error: deleteError } = await deleteAccount();
+
+    if (deleteError) {
+      setDeleting(false);
+      setError(deleteError);
+      Alert.alert(copy.account.deleteAccountTitle, copy.account.deleteAccountError);
+      return;
+    }
+
+    await signOut();
+    setDeleting(false);
+  };
+
+  const handleDeleteAccount = () => {
+    confirmDestructive(
+      copy.account.deleteAccountTitle,
+      copy.account.deleteAccountBody,
+      copy.account.deleteAccountConfirm,
+      copy.account.deleteAccountCancel,
+      runDeleteAccount,
+    );
   };
 
   const handleRefresh = async () => {
@@ -156,9 +186,25 @@ export default function AccountScreen() {
           <TouchableOpacity
             style={styles.signOutButton}
             onPress={handleSignOut}
+            disabled={deleting}
           >
             <LogOut size={20} color={AppColors.status.error} />
             <Text style={styles.signOutText}>{copy.account.signOut}</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.signOutButton, styles.deleteAccountButton, deleting && styles.buttonDisabled]}
+            onPress={handleDeleteAccount}
+            disabled={deleting || saving}
+          >
+            {deleting ? (
+              <ActivityIndicator color={AppColors.status.error} />
+            ) : (
+              <Trash2 size={20} color={AppColors.status.error} />
+            )}
+            <Text style={styles.signOutText}>
+              {deleting ? copy.account.deletingAccount : copy.account.deleteAccount}
+            </Text>
           </TouchableOpacity>
         </View>
 
@@ -321,6 +367,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+  },
+  deleteAccountButton: {
+    marginTop: 12,
   },
   signOutText: {
     color: AppColors.status.error,

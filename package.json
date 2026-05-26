@@ -18,7 +18,7 @@
     "supabase:local-test-users-seed": "node scripts/seed-local-test-users.mjs",
     "test:db": "npx supabase test db",
     "test:cron-edge": "deno test supabase/functions/edge-run-daily-cron/cron_handler_test.ts",
-    "supabase:functions:deploy": "npx supabase functions deploy update-leaderboard",
+    "supabase:functions:deploy": "npx supabase functions deploy update-leaderboard && npx supabase functions deploy delete-account",
     "android": "expo run:android",
     "ios": "expo run:ios"
   },
