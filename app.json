@@ -4,7 +4,7 @@
     "slug": "wordle-battle",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/iOS-icon.png",
+    "icon": "./images/iOS-icon.png",
     "scheme": "word-battle",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -15,16 +15,16 @@
       "buildNumber": "1",
       "usesAppleSignIn": true,
       "jsEngine": "jsc",
-      "icon": "./assets/images/iOS-icon.png",
+      "icon": "./images/iOS-icon.png",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
       "package": "com.heavyatom.wordbattle",
-      "icon": "./assets/images/androidAdaptive-icon.png",
+      "icon": "./images/androidAdaptive-icon.png",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/androidAdaptive-icon.png",
+        "foregroundImage": "./images/androidAdaptive-icon.png",
         "backgroundColor": "#733B3B"
       },
       "intentFilters": [
