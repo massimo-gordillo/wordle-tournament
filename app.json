@@ -4,7 +4,7 @@
     "slug": "wordle-battle",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/iOS-icon.png",
     "scheme": "word-battle",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -15,13 +15,28 @@
       "buildNumber": "1",
       "usesAppleSignIn": true,
       "jsEngine": "jsc",
+      "icon": "./assets/images/iOS-icon.png",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
       "package": "com.heavyatom.wordbattle",
+      "icon": "./assets/images/androidAdaptive-icon.png",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/androidAdaptive-icon.png",
+        "backgroundColor": "#733B3B"
+      },
       "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "word-battle"
+            }
+          ]
+        },
         {
           "action": "VIEW",
           "autoVerify": true,
@@ -53,6 +68,12 @@
         "projectId": "b8a17285-4346-4e49-bea1-c1552371cf2e"
       }
     },
-    "owner": "mount-everest-games"
+    "owner": "mount-everest-games",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/b8a17285-4346-4e49-bea1-c1552371cf2e"
+    }
   }
 }
