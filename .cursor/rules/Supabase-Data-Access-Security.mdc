@@ -24,6 +24,27 @@ alwaysApply: true
 - **Allowed** here: DDL, PL/pgSQL functions, triggers. Review any **`EXECUTE` of dynamic SQL**—must use **`format(... %L)`** / parameters, never untrusted string concatenation into SQL text.
 - `CREATE TRIGGER ... EXECUTE FUNCTION name()` is **PostgreSQL trigger syntax** (names a function), not “execute arbitrary SQL,” and is safe.
 
+## Data API grants (Supabase changelog [45329](https://supabase.com/changelog/45329-breaking-change-tables-not-exposed-to-data-and-graphql-api-automatically))
+
+New `public` tables and RPC functions are **not** exposed to PostgREST/GraphQL until you grant privileges. Treat this as part of every migration that adds schema the app calls via `supabase-js` or `/rest/v1/`.
+
+After `CREATE TABLE` and `ENABLE ROW LEVEL SECURITY` / policies, add explicit grants in the **same migration**:
+
+```sql
+GRANT ALL ON TABLE public.your_table TO anon, authenticated, service_role;
+-- Or narrower privileges if intentional; RLS still applies.
+```
+
+For RPC functions callable from the client or edge functions via PostgREST:
+
+```sql
+GRANT ALL ON FUNCTION public.your_rpc(arg_type, ...) TO anon, authenticated, service_role;
+```
+
+Internal trigger-only functions do not need Data API grants. Restrict sensitive RPCs (e.g. account deletion) with `REVOKE ALL ... FROM PUBLIC` and grant only `authenticated` / `service_role` as needed.
+
+Reference migration: `supabase/migrations/20260528120000_explicit_data_api_grants.sql` lists all current public tables and RPC grants.
+
 ## When adding new patterns
 
 - Prefer **RPC with typed arguments** over ad-hoc dynamic SQL in the database.
