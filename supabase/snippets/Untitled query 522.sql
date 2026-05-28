@@ -5,6 +5,6 @@ select cron.schedule(
   'edge-run-daily-cron-03utc',
   '0 3 * * *',
   $sql$
-  select public.run_daily_cron_for_date((now() at time zone 'America/New_York')::date);
+  select public.run_daily_cron_if_eastern_cutoff();
   $sql$
 );

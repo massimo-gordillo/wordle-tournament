@@ -5,10 +5,10 @@ import {
 import { corsHeaders, getEasternNowParts, handleEdgeCronRequest } from "./cron_handler.ts";
 
 Deno.test("getEasternNowParts uses America/New_York", () => {
-  // 2025-06-15 04:00:00 UTC = 2025-06-15 00:00 Eastern (EDT) -> hour 0
-  const parts = getEasternNowParts(new Date("2025-06-15T04:00:00.000Z"));
-  assertEquals(parts.hour, 0);
-  assertEquals(parts.dateStr, "2025-06-15");
+  // 2026-01-16 04:00:00 UTC = 2026-01-15 23:00 Eastern (EST) — penalty day must be the 15th
+  const parts = getEasternNowParts(new Date("2026-01-16T04:00:00.000Z"));
+  assertEquals(parts.hour, 23);
+  assertEquals(parts.dateStr, "2026-01-15");
 });
 
 Deno.test("OPTIONS returns 200 with CORS", async () => {
@@ -18,58 +18,73 @@ Deno.test("OPTIONS returns 200 with CORS", async () => {
 });
 
 Deno.test("GET returns 405", async () => {
-  const res = await handleEdgeCronRequest(new Request("http://x", { method: "GET" }), {
-    getNow: () => new Date("2025-06-15T04:00:00.000Z"),
-  });
+  const res = await handleEdgeCronRequest(new Request("http://x", { method: "GET" }), {});
   assertEquals(res.status, 405);
 });
 
-Deno.test("POST before 11 PM ET skips RPC", async () => {
-  const calls: string[] = [];
-  const res = await handleEdgeCronRequest(new Request("http://x", { method: "POST" }), {
-    getNow: () => new Date("2025-06-15T04:00:00.000Z"),
-    getEnv: () => undefined,
-    fetchImpl: () => {
-      calls.push("fetch");
-      return Promise.resolve(new Response("no", { status: 500 }));
-    },
-  });
-  assertEquals(res.status, 200);
-  const body = await res.json();
-  assertEquals(body.skipped, true);
-  assertEquals(calls.length, 0);
-});
-
-Deno.test("POST at 11 PM ET calls run_daily_cron_for_date with p_run_date", async () => {
+Deno.test("POST calls run_daily_cron_if_eastern_cutoff and returns skipped", async () => {
   let url = "";
-  let body = "";
-  // 2025-06-15 23:00 America/New_York (EDT) = 2025-06-16T03:00:00.000Z
   const res = await handleEdgeCronRequest(new Request("http://x", { method: "POST" }), {
-    getNow: () => new Date("2025-06-16T03:00:00.000Z"),
     getEnv: (n) =>
       n === "SUPABASE_URL"
         ? "http://local.test"
         : n === "SUPABASE_SERVICE_ROLE_KEY"
         ? "service-key"
         : undefined,
-    fetchImpl: (u, init) => {
+    fetchImpl: (u) => {
       url = String(u);
-      body = typeof init?.body === "string" ? init.body : "";
-      return Promise.resolve(new Response("{}", { status: 200 }));
+      return Promise.resolve(
+        new Response(
+          JSON.stringify({
+            success: true,
+            skipped: true,
+            message: "Skipped: not cutoff hour in America/New_York.",
+            hour_et: 22,
+            run_date_et: "2026-01-15",
+          }),
+          { status: 200 },
+        ),
+      );
     },
+  });
+  assertEquals(res.status, 200);
+  assertEquals(url, "http://local.test/rest/v1/rpc/run_daily_cron_if_eastern_cutoff");
+  const body = await res.json();
+  assertEquals(body.skipped, true);
+  assertEquals(body.hourEt, 22);
+  assertEquals(body.runDateEt, "2026-01-15");
+});
+
+Deno.test("POST returns run date when cron runs", async () => {
+  const res = await handleEdgeCronRequest(new Request("http://x", { method: "POST" }), {
+    getEnv: (n) =>
+      n === "SUPABASE_URL"
+        ? "http://local.test"
+        : n === "SUPABASE_SERVICE_ROLE_KEY"
+        ? "service-key"
+        : undefined,
+    fetchImpl: () =>
+      Promise.resolve(
+        new Response(
+          JSON.stringify({
+            success: true,
+            skipped: false,
+            run_date_et: "2026-01-15",
+            hour_et: 23,
+          }),
+          { status: 200 },
+        ),
+      ),
   });
   assertEquals(res.status, 200);
   const j = await res.json();
   assertEquals(j.skipped, false);
   assertExists(j.runDateEt);
-  assertEquals(url, "http://local.test/rest/v1/rpc/run_daily_cron_for_date");
-  const parsed = JSON.parse(body);
-  assertEquals(parsed.p_run_date, j.runDateEt);
+  assertEquals(j.runDateEt, "2026-01-15");
 });
 
 Deno.test("missing env returns 500", async () => {
   const res = await handleEdgeCronRequest(new Request("http://x", { method: "POST" }), {
-    getNow: () => new Date("2025-06-16T03:00:00.000Z"),
     getEnv: () => undefined,
     fetchImpl: () => Promise.resolve(new Response("{}", { status: 200 })),
   });
@@ -81,7 +96,6 @@ Deno.test("missing env returns 500", async () => {
 
 Deno.test("non-OK RPC returns 500", async () => {
   const res = await handleEdgeCronRequest(new Request("http://x", { method: "POST" }), {
-    getNow: () => new Date("2025-06-16T03:00:00.000Z"),
     getEnv: (n) =>
       n === "SUPABASE_URL" ? "http://local.test" : n === "SUPABASE_SERVICE_ROLE_KEY" ? "k" : undefined,
     fetchImpl: () => Promise.resolve(new Response("boom", { status: 503 })),

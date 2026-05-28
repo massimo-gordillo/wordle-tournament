@@ -4,6 +4,7 @@ export const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
+/** @deprecated Prefer run_daily_cron_if_eastern_cutoff RPC; kept for unit tests. */
 export function getEasternNowParts(date: Date = new Date()): { hour: number; dateStr: string } {
   const hourFmt = new Intl.DateTimeFormat("en-US", {
     timeZone: "America/New_York",
@@ -24,19 +25,26 @@ export function getEasternNowParts(date: Date = new Date()): { hour: number; dat
 }
 
 export type CronHandlerDeps = {
-  getNow?: () => Date;
   fetchImpl?: typeof fetch;
   getEnv?: (name: string) => string | undefined;
+};
+
+type CronRpcResult = {
+  success?: boolean;
+  skipped?: boolean;
+  message?: string;
+  hour_et?: number;
+  cutoff_hour_et?: number;
+  run_date_et?: string;
+  error?: string;
 };
 
 export async function handleEdgeCronRequest(
   req: Request,
   deps: CronHandlerDeps = {},
 ): Promise<Response> {
-  const getNow = deps.getNow ?? (() => new Date());
   const fetchImpl = deps.fetchImpl ?? fetch;
   const getEnv = deps.getEnv ?? ((name: string) => {
-    // Deno is provided by Edge runtime in index.ts; tests pass getEnv.
     const g = globalThis as unknown as { Deno?: { env: { get(name: string): string | undefined } } };
     return g.Deno?.env.get(name);
   });
@@ -53,23 +61,6 @@ export async function handleEdgeCronRequest(
   }
 
   try {
-    const { hour, dateStr } = getEasternNowParts(getNow());
-
-    if (hour !== 23) {
-      return new Response(
-        JSON.stringify({
-          success: true,
-          skipped: true,
-          message: "Skipped: not 11 PM ET.",
-          hourEt: hour,
-        }),
-        {
-          status: 200,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        },
-      );
-    }
-
     const supabaseUrl = getEnv("SUPABASE_URL");
     const supabaseServiceKey = getEnv("SUPABASE_SERVICE_ROLE_KEY");
 
@@ -77,28 +68,35 @@ export async function handleEdgeCronRequest(
       throw new Error("Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY.");
     }
 
-    const rpcResponse = await fetchImpl(`${supabaseUrl}/rest/v1/rpc/run_daily_cron_for_date`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${supabaseServiceKey}`,
-        apikey: supabaseServiceKey,
+    const rpcResponse = await fetchImpl(
+      `${supabaseUrl}/rest/v1/rpc/run_daily_cron_if_eastern_cutoff`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${supabaseServiceKey}`,
+          apikey: supabaseServiceKey,
+          Prefer: "return=representation",
+        },
+        body: "{}",
       },
-      body: JSON.stringify({
-        p_run_date: dateStr,
-      }),
-    });
+    );
 
     if (!rpcResponse.ok) {
       const errorText = await rpcResponse.text();
-      throw new Error(`run_daily_cron_for_date failed: ${errorText}`);
+      throw new Error(`run_daily_cron_if_eastern_cutoff failed: ${errorText}`);
     }
+
+    const result = (await rpcResponse.json()) as CronRpcResult;
 
     return new Response(
       JSON.stringify({
-        success: true,
-        skipped: false,
-        runDateEt: dateStr,
+        success: result.success ?? true,
+        skipped: result.skipped ?? false,
+        message: result.message,
+        hourEt: result.hour_et,
+        cutoffHourEt: result.cutoff_hour_et,
+        runDateEt: result.run_date_et,
       }),
       {
         status: 200,
